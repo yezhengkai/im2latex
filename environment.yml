@@ -1,0 +1,12 @@
+name: im2latex
+channels:
+  - defaults
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.8
+  - cudatoolkit=11.1
+  - pytorch=1.8.1
+  - torchvision=0.9.1
+  - pytorch-lightning=1.2.6
+  - six
