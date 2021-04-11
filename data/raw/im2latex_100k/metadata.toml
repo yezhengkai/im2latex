@@ -1,0 +1,29 @@
+[im2latex_validate_filter]
+url = "http://lstm.seas.harvard.edu/latex/data/im2latex_validate_filter.lst"
+filename = "im2latex_validate_filter.lst"
+sha256 = "97301db47887e331ebd0276065c6b587bbe338f040b5425cce2494c1e2d85f01"
+
+[im2latex_train_filter]
+url = "http://lstm.seas.harvard.edu/latex/data/im2latex_train_filter.lst"
+filename = "im2latex_train_filter.lst"
+sha256 = "2ea81411c6ffbb18d6acc745691915acd43e08272c06d17a1c8cc657654e8d93"
+
+[im2latex_test_filter]
+url = "http://lstm.seas.harvard.edu/latex/data/im2latex_test_filter.lst"
+filename = "im2latex_test_filter.lst"
+sha256 = "21f59377bfbb83682389c2fc81b63f0c16dd06d47c35a00e9e17cbb711bff9a6"
+
+[formula_images_processed]
+url = "http://lstm.seas.harvard.edu/latex/data/formula_images_processed.tar.gz"
+filename = "formula_images_processed.tar.gz"
+sha256 = "650d695eb841c461946aba8da24657b33a56b612a02e25d5f1cb473bae993033"
+
+[im2latex_formulas_tok]
+url = "http://lstm.seas.harvard.edu/latex/data/im2latex_formulas.tok.lst"
+filename = "im2latex_formulas.tok.lst"
+sha256 = "4405cf2ce4179a6eab814012bf2728d0442d903aa60d9363385239a201ea9f4a"
+
+[im2latex_formulas_norm]
+url = "http://lstm.seas.harvard.edu/latex/data/im2latex_formulas.norm.lst"
+filename = "im2latex_formulas.norm.lst"
+sha256 = "4d16bb9ba224a432002924499cacc084de859178da0da4987f66690bf6d3f9bc"
