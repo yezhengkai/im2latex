@@ -1,0 +1,12 @@
+# Data
+data/downloaded
+data/processed
+data/interim
+
+# Editors
+.vscode
+
+# Python
+__pycache__
+.pytest_cache
+.ipynb_checkpoints
