@@ -104,7 +104,10 @@ class Im2Latex100K(BaseDataModule):
         return DataLoader(
             self.data_train,
             shuffle=False,
-            batch_sampler=BucketBatchSampler(self.data_train, self.batch_size),
+            batch_sampler=BucketBatchSampler(
+                list((i, Image.open(path).size) for i, path in enumerate(self.data_train.data)),
+                self.batch_size
+            ),
             num_workers=self.num_workers,
             pin_memory=self.on_gpu
         )
@@ -113,7 +116,10 @@ class Im2Latex100K(BaseDataModule):
         return DataLoader(
             self.data_val,
             shuffle=False,
-            batch_sampler=BucketBatchSampler(self.data_val, self.batch_size),
+            batch_sampler=BucketBatchSampler(
+                list((i, Image.open(path).size) for i, path in enumerate(self.data_val.data)),
+                self.batch_size
+            ),
             num_workers=self.num_workers,
             pin_memory=self.on_gpu
         )
@@ -122,7 +128,10 @@ class Im2Latex100K(BaseDataModule):
         return DataLoader(
             self.data_test,
             shuffle=False,
-            batch_sampler=BucketBatchSampler(self.data_test, self.batch_size),
+            batch_sampler=BucketBatchSampler(
+                list((i, Image.open(path).size) for i, path in enumerate(self.data_test.data)),
+                self.batch_size
+            ),
             num_workers=self.num_workers,
             pin_memory=self.on_gpu
         )
@@ -219,42 +228,36 @@ class Im2LatexDataset(BaseDataset):
 # https://discuss.pytorch.org/t/tensorflow-esque-bucket-by-sequence-length/41284/13
 class BucketBatchSampler(Sampler):
     # want inputs to be an array
-    def __init__(self, inputs, batch_size):
+    def __init__(self, idx_imgsize, batch_size):
         self.batch_size = batch_size
-        ind_n_len = []
-        for i, p in enumerate(inputs):
-            ind_n_len.append((i, p[0].shape))
-        self.ind_n_len = ind_n_len
+        self.idx_imgsize = idx_imgsize
         self.batch_list = self._generate_batch_map()
         self.num_batches = len(self.batch_list)
 
     def _generate_batch_map(self):
         # shuffle all of the indices first so they are put into buckets differently
-        shuffle(self.ind_n_len)
-        # Organize lengths, e.g., batch_map[10] = [30, 124, 203, ...] <= indices of sequences of length 10
+        shuffle(self.idx_imgsize)
+        # Organize size, e.g., batch_map[(192, 32)] = [30, 124, 203, ...] <= indices of image of size (192, 32)
         batch_map = OrderedDict()
-        for idx, length in self.ind_n_len:
-            if length not in batch_map:
-                batch_map[length] = [idx]
+        for idx, imgsize in self.idx_imgsize:
+            if imgsize not in batch_map:
+                batch_map[imgsize] = [idx]
             else:
-                batch_map[length].append(idx)
+                batch_map[imgsize].append(idx)
         # Use batch_map to split indices into batches of equal size
         # e.g., for batch_size=3, batch_list = [[23,45,47], [49,50,62], [63,65,66], ...]
         batch_list = []
-        for length, indices in batch_map.items():
+        for _, indices in batch_map.items():
             for group in [indices[i:(i + self.batch_size)] for i in range(0, len(indices), self.batch_size)]:
                 batch_list.append(group)
         return batch_list
 
-    def batch_count(self):
-        return self.num_batches
-
     def __len__(self):
-        return len(self.ind_n_len)
+        return self.num_batches
 
     def __iter__(self):
         self.batch_list = self._generate_batch_map()
-        # shuffle all the batches so they arent ordered by bucket size
+        # shuffle all the batches so they aren't ordered by bucket size
         shuffle(self.batch_list)
         for i in self.batch_list:
             yield i
