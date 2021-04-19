@@ -175,7 +175,7 @@ def load_processed_crops_and_labels(split: str, max_label_length) -> Tuple[Seque
         for line in f:
             id_, ind = line.strip('\n').split()
             formula = all_formulas[int(ind)].split()
-            if len(formula) > max_label_length:
+            if len(formula) > max_label_length or len(formula) == 0:
                 continue
             formulas.append(formula)
             imgs_path.append(_crop_filename(id_, split))
