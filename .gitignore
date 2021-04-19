@@ -3,6 +3,9 @@ data/downloaded
 data/processed
 data/interim
 
+# Logs
+training/logs
+
 # Editors
 .vscode
 
