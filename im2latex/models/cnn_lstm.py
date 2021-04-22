@@ -163,7 +163,7 @@ class CNNLSTM(nn.Module):
         o_t = self.dropout(o_t)
 
         # calculate logit
-        logit = F.softmax(self.W_out(o_t), dim=1)  # [B, out_size]
+        logit = self.W_out(o_t)  # [B, out_size]
 
         return (h_t, c_t), o_t, logit
 
@@ -227,49 +227,24 @@ class CNNLSTM(nn.Module):
         # encoding
         encoded_imgs = self.encode(x)  # [B, H'*W', 512]
         # init decoder's states
-        dec_states, o_t = self.init_decoder(encoded_imgs)
-
-        output_tokens = (torch.ones((B, S)) * self.padding_token).type_as(x).long()  # (B, S)
+        dec_states, O_t = self.init_decoder(encoded_imgs)
+        output_tokens = torch.ones(B, S).type_as(x).long() * self.padding_token
         output_tokens[:, 0] = self.start_token  # Set start token
-        for Sy in range(1, S):
-            y = output_tokens[:, Sy-1:Sy]  # (B, Sy)
-            # output = self.decode(x, y)  # (Sy, B, C)
-            # decode
-            # if output and self.uniform.sample().item() > 1.:
-            #     y = torch.argmax(torch.log(output[-1]), dim=1, keepdim=True)
-            # ont step decoding
-            
-            dec_states, O_t, output = self.step_decoding(
-                dec_states, o_t, encoded_imgs, y)
-            output = torch.argmax(output, dim=-1)  # (Sy, B)
-            output_tokens[:, Sy] = output[-1:]  # Set the last output token
-            # output = []  # logits
-            # for t in range(S + 2):
-            #     tgt = y[:, t:t+1]
-            #     print(f"t: {t}, y: {y.shape}")
-            #     # schedule sampling
-            #     if output and self.uniform.sample().item() > 1.:
-            #         tgt = torch.argmax(torch.log(output[-1]), dim=1, keepdim=True)
-            #     # ont step decoding
-            #     dec_states, O_t, logit = self.step_decoding(
-            #         dec_states, o_t, encoded_imgs, tgt)
-            #     output.append(logit)
-            # output = torch.stack(output, dim=1)  # [B, MAX_LEN, VOCAB_SIZE] == (B, Sy, C)?
-            # output = output.permute(1, 0, 2)  # # (Sy, B, C)
+        tgt = torch.ones(B, 1).type_as(x).long() * self.start_token
+        # with torch.no_grad():
+        for t in range(1, S):
+            dec_states, O_t, logit = self.step_decoding(
+                dec_states, O_t, encoded_imgs, tgt)
 
-            # output = torch.argmax(output, dim=-1)  # (Sy, B)
-            # output_tokens[:, Sy] = output[-1:]  # Set the last output token
-
-            # Early stopping of prediction loop to speed up prediction
-            if ((output_tokens[:, Sy] == self.end_token) | (output_tokens[:, Sy] == self.padding_token)).all():
-                break
+            tgt = torch.argmax(logit, dim=1, keepdim=True)
+            output_tokens[:, t:t + 1] = tgt
 
         # Set all tokens after end token to be padding
         for Sy in range(1, S):
             ind = (output_tokens[:, Sy - 1] == self.end_token) | (output_tokens[:, Sy - 1] == self.padding_token)
             output_tokens[ind, Sy] = self.padding_token
 
-        return output_tokens.long()  # (B, Sy)
+        return output_tokens  # (B, Sy)
 
     @staticmethod
     def add_to_argparse(parser):
