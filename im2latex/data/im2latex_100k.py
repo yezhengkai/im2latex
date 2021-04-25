@@ -1,23 +1,25 @@
 """IM2LATEX100K DataModule"""
+from itertools import compress
 from collections import Counter, OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import pickle
 from random import shuffle
-from string import Template
-from typing import Any, Sequence, Tuple, Union
+from typing import Callable, List, Sequence, Tuple, Union
 import json
 import argparse
 import shutil
 import tarfile
 
+import numpy as np
 from PIL import Image
 from torch.utils.data import Sampler
-import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import toml
 
 from im2latex.data.base_data_module import _download_raw_dataset, BaseDataModule, load_and_print_info
-from im2latex.data.util import BaseDataset, convert_strings_to_labels
+from im2latex.data.util import BaseDataset, SequenceOrTensor, convert_strings_to_labels
 
 IMAGE_HEIGHT = None
 IMAGE_WIDTH = None
@@ -28,8 +30,7 @@ RAW_DATA_DIRNAME = BaseDataModule.data_dirname() / "raw" / "im2latex_100k"
 METADATA_FILENAME = RAW_DATA_DIRNAME / "metadata.toml"
 DL_DATA_DIRNAME = BaseDataModule.data_dirname() / "downloaded" / "im2latex_100k"
 PROCESSED_DATA_DIRNAME = BaseDataModule.data_dirname() / "processed" / "im2latex_100k"
-PROCESSED_DATA_FILETEMPLATE = Template("vocab_$min_count.json")
-
+PROCESSED_DATA_FILENAME = PROCESSED_DATA_DIRNAME / "data.pkl"
 
 # TODO:
 # 1. implement __repr__ 
@@ -46,19 +47,14 @@ class Im2Latex100K(BaseDataModule):
         self.min_count = self.args.get("min_count", MIN_COUNT)
         self.max_label_length = self.args.get("max_label_length", MAX_LABEL_LENGTH)
         self.augment = self.args.get("augment_data", "true").lower() == "true"
-
-        self.PROCESSED_DATA_FILENAME = (
-            PROCESSED_DATA_DIRNAME / PROCESSED_DATA_FILETEMPLATE.substitute(min_count=self.min_count)
-        )
-
         self.data_dir = DL_DATA_DIRNAME
-        if not self.PROCESSED_DATA_FILENAME.is_file():
-            _download_and_process_im2latex(self.PROCESSED_DATA_FILENAME, self.min_count)
-        with open(self.PROCESSED_DATA_FILENAME) as f:
-            vocab = json.load(f)
-        assert vocab.get("vocab") is not None
-        self.mapping = list(vocab["vocab"])
-        self.inverse_mapping = {v: k for k, v in enumerate(self.mapping)}
+
+        self.prepare_data()
+        with open(self.vocab_filename) as f:
+            vocab_dict = json.load(f)
+        assert vocab_dict.get("vocab") is not None
+        self.mapping = list(vocab_dict["vocab"])  # label to string
+        self.inverse_mapping = {v: k for k, v in enumerate(self.mapping)}  # string to label
         
         self.dims = (1, IMAGE_HEIGHT, IMAGE_WIDTH)
         assert self.max_label_length <= MAX_LABEL_LENGTH
@@ -72,41 +68,51 @@ class Im2Latex100K(BaseDataModule):
         parser.add_argument("--max_label_length", type=int, default=MAX_LABEL_LENGTH)
         return parser
 
+    @property
+    def vocab_filename(self):
+        return PROCESSED_DATA_DIRNAME / f"min_count={self.min_count}.json"
+
     def prepare_data(self, *args, **kwargs) -> None:
         """
         Use this method to do things that might write to disk or that need to be done only from a single GPU
         in distributed settings (so don't set state `self.x = y`).
         """
-        if not self.PROCESSED_DATA_FILENAME.is_file():
-            _download_and_process_im2latex(self.PROCESSED_DATA_FILENAME, self.min_count)
+        if not self.vocab_filename.is_file():
+            _download_and_process_im2latex(self.vocab_filename, self.min_count)
 
     def setup(self, stage=None) -> None:
         """
         Split into train, val, test, and set dims.
         Should assign `torch Dataset` objects to self.data_train, self.data_val, and optionally self.data_test.
         """
-        pass
-        def _load_dataset(split: str, augment: bool, max_label_length: int = self.max_label_length) -> BaseDataset:
-            imgs_path, labels = load_processed_crops_and_labels(split, max_label_length)
-            # length add 2 because of start and end tokens
-            labels = convert_strings_to_labels(strings=labels, mapping=self.inverse_mapping, length=self.output_dims[0] + 2)
-            transform = get_transform(augment=augment)  # type: ignore
-            return Im2LatexDataset(imgs_path, labels, transform=transform)
-
+        def _load_dataset(data_dict, split: str, augment: bool, max_label_length: int) -> BaseDataset:
+            # https://stackoverflow.com/questions/13397385/python-filter-and-list-and-apply-filtered-indices-to-another-list
+            selectors = list(map(lambda y: not len(y) > max_label_length, data_dict[f"y_{split}"]))
+            x = list(compress(data_dict[f"x_{split}"], selectors))
+            y = list(compress(data_dict[f"y_{split}"], selectors))
+            x_shape = list(compress(data_dict[f"x_shape_{split}"], selectors))
+            y = convert_strings_to_labels(strings=y, mapping=self.inverse_mapping, length=self.output_dims[0] + 2)
+            transform = get_transform(augment=augment)
+            return Im2LatexDataset(x, y, x_shape, transform=transform)
+        
+        with open(PROCESSED_DATA_FILENAME, 'rb') as f:
+            data_dict = pickle.load(f)
+        
         if stage == "fit" or stage is None:
-            self.data_train = _load_dataset(split="train", augment=self.augment)
-            self.data_val = _load_dataset(split="validate", augment=self.augment)
+            self.data_train = _load_dataset(data_dict, "train", self.augment, self.max_label_length)
+            self.data_val = _load_dataset(data_dict,"validate", self.augment, self.max_label_length)
 
         if stage == "test" or stage is None:
-            self.data_test = _load_dataset(split="test", augment=False)
+            self.data_test = _load_dataset(data_dict, "test", False, self.max_label_length)
     
     def train_dataloader(self):
         return DataLoader(
             self.data_train,
             shuffle=False,
             batch_sampler=BucketBatchSampler(
-                list((i, Image.open(path).size) for i, path in enumerate(self.data_train.data)),
-                self.batch_size
+                list((i, data_shape) for i, data_shape in enumerate(self.data_train.data_shape)),
+                self.batch_size,
+                shuffle=True
             ),
             num_workers=self.num_workers,
             pin_memory=self.on_gpu
@@ -117,8 +123,9 @@ class Im2Latex100K(BaseDataModule):
             self.data_val,
             shuffle=False,
             batch_sampler=BucketBatchSampler(
-                list((i, Image.open(path).size) for i, path in enumerate(self.data_val.data)),
-                self.batch_size
+                list((i, data_shape) for i, data_shape in enumerate(self.data_val.data_shape)),
+                self.batch_size,
+                shuffle=False
             ),
             num_workers=self.num_workers,
             pin_memory=self.on_gpu
@@ -129,65 +136,126 @@ class Im2Latex100K(BaseDataModule):
             self.data_test,
             shuffle=False,
             batch_sampler=BucketBatchSampler(
-                list((i, Image.open(path).size) for i, path in enumerate(self.data_test.data)),
-                self.batch_size
+                list((i, data_shape) for i, data_shape in enumerate(self.data_test.data_shape)),
+                self.batch_size,
+                shuffle=False
             ),
             num_workers=self.num_workers,
             pin_memory=self.on_gpu
         )
 
 
-def _download_and_process_im2latex(processed_data_filename, min_count: int = 10):
+def _download_and_process_im2latex(vocab_filename, min_count: int = 10):
     metadata = toml.load(METADATA_FILENAME)
     for _metadata in metadata.values():
         if not (DL_DATA_DIRNAME / _metadata["filename"]).is_file():
             _download_raw_dataset(_metadata, DL_DATA_DIRNAME)
-    _process_raw_dataset(metadata, processed_data_filename, min_count=min_count)
+    _process_raw_dataset(metadata, vocab_filename, min_count=min_count)
     
 
-def _process_raw_dataset(metadata: dict, processed_data_filename: Union[Path, str], min_count: int = 10):
-    image_tarfile = DL_DATA_DIRNAME / metadata["formula_images_processed"]["filename"]
+def _process_raw_dataset(metadata: dict, vocab_filename: Union[Path, str], min_count: int = 10):
+    # unzip tar file
+    img_tarfile = DL_DATA_DIRNAME / metadata["formula_images_processed"]["filename"]
     if not (PROCESSED_DATA_DIRNAME / "formula_images_processed").is_dir():
         print("Unzipping formula_images_processed.tar.gz...")
-        with tarfile.open(image_tarfile, "r:gz") as tar_file:
+        with tarfile.open(img_tarfile, "r:gz") as tar_file:
             tar_file.extractall(PROCESSED_DATA_DIRNAME)
-
-    print("Build vocabulary...")
-    vocab = build_vocab(DL_DATA_DIRNAME, min_count=min_count)
-    with open(processed_data_filename, "w") as f:
-        json.dump({"vocab": vocab}, f)
-
+    
+    # move .lst files to PROCESSED_DATA_DIRNAME
     for _metadata in metadata.values():
         if not (PROCESSED_DATA_DIRNAME / _metadata["filename"]).is_file() \
             and (DL_DATA_DIRNAME / _metadata["filename"]).suffix == ".lst":
             shutil.copy(DL_DATA_DIRNAME / _metadata["filename"],
                         PROCESSED_DATA_DIRNAME / _metadata["filename"])
 
+    # save data.pkl
+    if not PROCESSED_DATA_FILENAME.is_file():
+        print(
+            "Save `array (from image)`, `latex`, `image size` and `image file name` to the dictionary "
+            + "with the corresponding keys `x_{split}`, `y_{split}`, `x_shape_{split}` and `img_filename_{split}`..."
+        )
+        data_dict = {
+            "x_train": [],
+            "x_validate": [],
+            "x_test": [],
+            "y_train": [],
+            "y_validate": [],
+            "y_test": [],
+            "x_shape_train": [],
+            "x_shape_validate": [],
+            "x_shape_test": [],
+            "img_filename_train": [],
+            "img_filename_validate": [],
+            "img_filename_test": [],
+        }
+        formulas = get_all_formulas(split_it=True)  # list of list of str
+        for split in ["train", "validate", "test"]:
+            with open(get_list_filename(split), 'r') as f:
+                for line in f:
+                    img_filename, idx = line.strip('\n').split()
+                    formula = formulas[int(idx)]  # list of str
+                    if len(formula) == 0:
+                        pass
+                    else:
+                        data_dict[f"img_filename_{split}"].append(img_filename)
+                        data_dict[f"y_{split}"].append(formula)
 
-def load_processed_crops_and_labels(split: str, max_label_length) -> Tuple[Sequence[Image.Image], Sequence[str]]:
-    """Load processed images and labels for given split."""
-    with open(PROCESSED_DATA_DIRNAME / "im2latex_formulas.norm.lst", 'r') as f:
-        all_formulas = [formula.strip('\n') for formula in f.readlines()]
+            with ThreadPoolExecutor() as executor:
+                result_iterator = executor.map(_get_img_info, data_dict[f"img_filename_{split}"])
 
-    imgs_path = []
-    formulas = []
-    with open(_labels_filename(split), 'r') as f:
-        for line in f:
-            id_, ind = line.strip('\n').split()
-            formula = all_formulas[int(ind)].split()
-            if len(formula) > max_label_length or len(formula) == 0:
-                continue
-            formulas.append(formula)
-            imgs_path.append(_crop_filename(id_, split))
-            
-    assert len(imgs_path) == len(formulas)
-    return imgs_path, formulas
+            for img_array, img_size in result_iterator:
+                data_dict[f"x_{split}"].append(img_array)
+                data_dict[f"x_shape_{split}"].append(img_size)
+        
+        print(f"Save the dictionary to {PROCESSED_DATA_FILENAME}...")
+        with open(PROCESSED_DATA_FILENAME, 'wb') as f:
+            pickle.dump(data_dict, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    print("Build vocabulary...")
+    vocab = build_vocab(min_count=min_count)
+    with open(vocab_filename, "w") as f:
+        json.dump({"vocab": vocab}, f)
+
+
+def _get_img_info(img_id: str):
+    img_filename = get_img_filename(img_id)
+    img = Image.open(img_filename).convert("L")
+    array = np.array(img)
+    array_shape = array.shape  # (row, col) ((row, col) in array == (Height, Width) in image)
+    return array, array_shape
+
+
+def get_all_formulas(
+    list_filename: Union[str, Path, None] = None,
+    split_it: bool = False
+) -> Union[List[List[str]], List[str]]:
+    if list_filename is None:
+        list_filename = PROCESSED_DATA_DIRNAME / "im2latex_formulas.norm.lst"
+    with open(list_filename, 'r') as f:
+        formulas = [formula.strip('\n') for formula in f.readlines()]
+    if split_it:
+        formulas = list(map(str.split, formulas))
+    
+    return formulas
+
+
+def get_list_filename(split: str) -> Path:
+    """Return filename of im2latex_{split}_filter.lst."""
+    return PROCESSED_DATA_DIRNAME / f"im2latex_{split}_filter.lst"
+
+
+def get_img_filename(img_id: str) -> Path:
+    """Return filename of processed crop."""
+    if not img_id.endswith(".png"):
+        img_id = img_id + ".png"
+    return PROCESSED_DATA_DIRNAME / "formula_images_processed" / img_id
 
 
 def get_transform(augment: bool) -> transforms.Compose:
     """Get transformations for images."""
     if augment:
         transforms_list = [
+            transforms.ToPILImage(),
             transforms.ColorJitter(brightness=(0.8, 1.6)),
             transforms.RandomAffine(
                 degrees=1,
@@ -201,42 +269,35 @@ def get_transform(augment: bool) -> transforms.Compose:
     return transforms.Compose(transforms_list)
 
 
-def _labels_filename(split: str) -> Path:
-    """Return filename of processed labels."""
-    return PROCESSED_DATA_DIRNAME / f"im2latex_{split}_filter.lst"
-
-
-def _crop_filename(id_: str, split: str) -> Path:
-    """Return filename of processed crop."""
-    return PROCESSED_DATA_DIRNAME / "formula_images_processed" / f"{id_}"
-
-
 class Im2LatexDataset(BaseDataset):
-
-    def __getitem__(self, index: int) -> Tuple[Any, Any]:
-        datum, target = Image.open(self.data[index]).convert("L"), self.targets[index]
-
-        if self.transform is not None:
-            datum = self.transform(datum)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-
-        return datum, target
+    def __init__(
+        self,
+        data: SequenceOrTensor,
+        targets: SequenceOrTensor,
+        data_shape: List[tuple], 
+        transform: Callable = None,
+        target_transform: Callable = None,
+    ) -> None:
+        if len(data) != len(targets):
+            raise ValueError("Data and targets must be of equal length")
+        super().__init__(data, targets, transform=transform, target_transform=target_transform)
+        self.data_shape = data_shape
 
 
 # https://discuss.pytorch.org/t/tensorflow-esque-bucket-by-sequence-length/41284/13
 class BucketBatchSampler(Sampler):
     # want inputs to be an array
-    def __init__(self, idx_imgsize, batch_size):
-        self.batch_size = batch_size
+    def __init__(self, idx_imgsize, batch_size, shuffle=False):
         self.idx_imgsize = idx_imgsize
+        self.batch_size = batch_size
+        self.shuffle = shuffle
         self.batch_list = self._generate_batch_map()
         self.num_batches = len(self.batch_list)
 
     def _generate_batch_map(self):
         # shuffle all of the indices first so they are put into buckets differently
-        shuffle(self.idx_imgsize)
+        if self.shuffle:
+            shuffle(self.idx_imgsize)
         # Organize size, e.g., batch_map[(192, 32)] = [30, 124, 203, ...] <= indices of image of size (192, 32)
         batch_map = OrderedDict()
         for idx, imgsize in self.idx_imgsize:
@@ -258,25 +319,23 @@ class BucketBatchSampler(Sampler):
     def __iter__(self):
         self.batch_list = self._generate_batch_map()
         # shuffle all the batches so they aren't ordered by bucket size
-        shuffle(self.batch_list)
+        if self.shuffle: 
+            shuffle(self.batch_list)
         for i in self.batch_list:
             yield i
 
 
-def build_vocab(lstdir: Union[Path, str], min_count: int=10) -> Sequence[str]:
+def build_vocab(min_count: int=10) -> Sequence[str]:
     """Add the mapping with special symbols."""
-
-    lstdir = Path(lstdir)
+    # listdir = Path(listdir)
     counter = Counter()
     vocab = []
 
-    with open(lstdir / "im2latex_formulas.norm.lst", 'r') as f:
-        formulas = [formula.strip('\n') for formula in f.readlines()]
-
-    with open(lstdir / "im2latex_train_filter.lst", 'r') as f:
+    formulas = get_all_formulas(split_it=True)
+    with open(get_list_filename("train"), 'r') as f:
         for line in f:
             _, idx = line.strip('\n').split()
-            formula = formulas[int(idx)].split()
+            formula = formulas[int(idx)]
             counter.update(formula)
     
     for word, count in counter.most_common():
