@@ -13,3 +13,6 @@ training/logs
 __pycache__
 .pytest_cache
 .ipynb_checkpoints
+
+# W&B
+wandb
