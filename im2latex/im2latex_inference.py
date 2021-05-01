@@ -12,8 +12,7 @@ from im2latex.lit_models import BaseLitModel
 from im2latex.models import CNNLSTM
 import im2latex.util as util
 
-
-CONFIG_AND_WEIGHTS_DIRNAME = Path(__file__).resolve().parents[1] / "artifacts" / "im2latex"
+CONFIG_AND_WEIGHTS_DIRNAME = Path(__file__).resolve().parent / "artifacts" / "im2latex"
 
 
 class Im2LatexInference:
@@ -49,6 +48,7 @@ class Im2LatexInference:
         # image_pil = resize_image(image_pil, IMAGE_SCALE_FACTOR)
         image_tensor = self.transform(image_pil)
 
+        # y_pred = self.model(image_tensor.unsqueeze(axis=0))[0]
         y_pred = self.scripted_model(image_tensor.unsqueeze(axis=0))[0]
         y_pred = self.lit_model(image_tensor.unsqueeze(axis=0))[0]
         pred_str = convert_y_label_to_string(y=y_pred, mapping=self.mapping, ignore_tokens=self.ignore_tokens)
