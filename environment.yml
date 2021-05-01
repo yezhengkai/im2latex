@@ -14,6 +14,19 @@ dependencies:
   - uvicorn
   - editdistance
   - toml
+  ## dev
   - wandb
   - jupyterlab
   - matplotlib
+  # test
+  - pytest
+  - pytest-xdist
+  # linter
+  - pycodestyle
+  - pylint
+  - pydocstyle
+  - mypy
+  - bandit
+  - safety
+  # formatter
+  - black
