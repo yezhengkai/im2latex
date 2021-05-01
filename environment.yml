@@ -9,8 +9,11 @@ dependencies:
   - pytorch=1.8.1
   - torchvision=0.9.1
   - pytorch-lightning=1.2.6
+  - smart_open
+  - fastapi
+  - uvicorn
   - editdistance
-  - wandb
   - toml
+  - wandb
   - jupyterlab
   - matplotlib
