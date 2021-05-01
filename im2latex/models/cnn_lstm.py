@@ -5,9 +5,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
-from torch.distributions.uniform import Uniform
-
-# from .position_embedding import add_positional_features
 
 # Common type hints
 Param2D = Union[int, Tuple[int, int]]
@@ -74,7 +71,7 @@ class CNNLSTM(nn.Module):
         emb_size = self.args.get("emb_dim", EMB_SIZE)
         dec_rnn_h = self.args.get("dec_rnn_h", DEC_RNN_H)
         add_pos_feat = self.args.get("add_position_features", ADD_POS_FEAT)
-        dropout = self.args.get("dropout", DROPOUT)
+        dropout = float(self.args.get("dropout", DROPOUT))
 
         self.cnn_encoder = nn.Sequential(
             ConvBlock(1, 64),
@@ -108,9 +105,8 @@ class CNNLSTM(nn.Module):
 
         self.add_pos_feat = add_pos_feat
         self.dropout = nn.Dropout(p=dropout)
-        self.uniform = Uniform(0, 1)
 
-    def forward(self, imgs, formulas, epsilon=1.):
+    def forward(self, imgs, formulas):
         """args:
         imgs: [B, C, H, W]
         formulas: [B, MAX_LEN]
@@ -127,8 +123,7 @@ class CNNLSTM(nn.Module):
         logits = []
         for t in range(max_len):
             tgt = formulas[:, t:t+1]
-            # schedule sampling
-            if logits and self.uniform.sample().item() > epsilon:
+            if logits:
                 tgt = torch.argmax(torch.log(logits[-1]), dim=1, keepdim=True)
             # ont step decoding
             dec_states, O_t, logit = self.step_decoding(
@@ -137,7 +132,7 @@ class CNNLSTM(nn.Module):
         logits = torch.stack(logits, dim=1)  # [B, MAX_LEN, VOCAB_SIZE]
         return logits.permute(0, 2, 1)  # (B, C, Sy)
 
-    def encode(self, imgs):
+    def encode(self, imgs: torch.Tensor) -> torch.Tensor:
         encoded_imgs = self.cnn_encoder(imgs)  # [B, 512, H', W']
         encoded_imgs = encoded_imgs.permute(0, 2, 3, 1)  # [B, H', W', 512]
         B, H, W, _ = encoded_imgs.shape
@@ -146,7 +141,7 @@ class CNNLSTM(nn.Module):
             encoded_imgs = add_positional_features(encoded_imgs)
         return encoded_imgs
 
-    def step_decoding(self, dec_states, o_t, enc_out, tgt):
+    def step_decoding(self, dec_states: Tuple[torch.Tensor, torch.Tensor], o_t: torch.Tensor, enc_out: torch.Tensor, tgt: torch.Tensor):
         """Runing one step decoding"""
         
         prev_y = self.embedding(tgt).squeeze(1)  # [B, emb_size]
@@ -259,7 +254,7 @@ class CNNLSTM(nn.Module):
 
 def add_positional_features(tensor: torch.Tensor,
                             min_timescale: float = 1.0,
-                            max_timescale: float = 1.0e4):
+                            max_timescale: float = 1.0e4) -> torch.Tensor:
     """
     Implements the frequency-based positional encoding described
     in `Attention is all you Need
@@ -303,5 +298,5 @@ def add_positional_features(tensor: torch.Tensor,
     return tensor + sinusoids.unsqueeze(0)
 
 
-def get_range_vector(size: int, device) -> torch.Tensor:
+def get_range_vector(size: int, device: torch.device) -> torch.Tensor:
     return torch.arange(0, size, dtype=torch.long, device=device)
