@@ -23,6 +23,7 @@ FILE_NAME = Path(__file__).resolve()
 ARTIFACTS_BASE_DIRNAME = FILE_NAME.parents[1] / "im2latex" / "artifacts"
 TRAINING_LOGS_DIRNAME = FILE_NAME.parent / "logs"
 
+
 def save_best_model():
     """Find and save the best model trained on a given dataset to artifacts directory."""
     parser = _setup_parser()

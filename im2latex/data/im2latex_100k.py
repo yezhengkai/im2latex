@@ -33,7 +33,7 @@ PROCESSED_DATA_DIRNAME = BaseDataModule.data_dirname() / "processed" / "im2latex
 PROCESSED_DATA_FILENAME = PROCESSED_DATA_DIRNAME / "data.pkl"
 
 # TODO:
-# 1. implement __repr__ 
+# 1. implement __repr__
 # 2. add parameters to select normalization or raw latex
 # 3. rename function
 class Im2Latex100K(BaseDataModule):
@@ -42,7 +42,7 @@ class Im2Latex100K(BaseDataModule):
     Learn more at https://pytorch-lightning.readthedocs.io/en/stable/extensions/datamodules.html
     """
 
-    def __init__(self, args: argparse.Namespace=None) -> None:
+    def __init__(self, args: argparse.Namespace = None) -> None:
         super().__init__(args)
         self.min_count = self.args.get("min_count", MIN_COUNT)
         self.max_label_length = self.args.get("max_label_length", MAX_LABEL_LENGTH)
@@ -55,7 +55,7 @@ class Im2Latex100K(BaseDataModule):
         assert vocab_dict.get("vocab") is not None
         self.mapping = list(vocab_dict["vocab"])  # label to string
         self.inverse_mapping = {v: k for k, v in enumerate(self.mapping)}  # string to label
-        
+
         self.dims = (1, IMAGE_HEIGHT, IMAGE_WIDTH)
         assert self.max_label_length <= MAX_LABEL_LENGTH
         self.output_dims = (MAX_LABEL_LENGTH, 1)
@@ -85,6 +85,7 @@ class Im2Latex100K(BaseDataModule):
         Split into train, val, test, and set dims.
         Should assign `torch Dataset` objects to self.data_train, self.data_val, and optionally self.data_test.
         """
+
         def _load_dataset(data_dict, split: str, augment: bool, max_label_length: int) -> BaseDataset:
             # https://stackoverflow.com/questions/13397385/python-filter-and-list-and-apply-filtered-indices-to-another-list
             selectors = list(map(lambda y: not len(y) > max_label_length, data_dict[f"y_{split}"]))
@@ -94,17 +95,17 @@ class Im2Latex100K(BaseDataModule):
             y = convert_strings_to_labels(strings=y, mapping=self.inverse_mapping, length=self.output_dims[0] + 2)
             transform = get_transform(augment=augment)
             return Im2LatexDataset(x, y, x_shape, transform=transform)
-        
-        with open(PROCESSED_DATA_FILENAME, 'rb') as f:
+
+        with open(PROCESSED_DATA_FILENAME, "rb") as f:
             data_dict = pickle.load(f)
-        
+
         if stage == "fit" or stage is None:
             self.data_train = _load_dataset(data_dict, "train", self.augment, self.max_label_length)
-            self.data_val = _load_dataset(data_dict,"validate", self.augment, self.max_label_length)
+            self.data_val = _load_dataset(data_dict, "validate", self.augment, self.max_label_length)
 
         if stage == "test" or stage is None:
             self.data_test = _load_dataset(data_dict, "test", False, self.max_label_length)
-    
+
     def train_dataloader(self):
         return DataLoader(
             self.data_train,
@@ -112,10 +113,10 @@ class Im2Latex100K(BaseDataModule):
             batch_sampler=BucketBatchSampler(
                 list((i, data_shape) for i, data_shape in enumerate(self.data_train.data_shape)),
                 self.batch_size,
-                shuffle=True
+                shuffle=True,
             ),
             num_workers=self.num_workers,
-            pin_memory=self.on_gpu
+            pin_memory=self.on_gpu,
         )
 
     def val_dataloader(self):
@@ -125,10 +126,10 @@ class Im2Latex100K(BaseDataModule):
             batch_sampler=BucketBatchSampler(
                 list((i, data_shape) for i, data_shape in enumerate(self.data_val.data_shape)),
                 self.batch_size,
-                shuffle=False
+                shuffle=False,
             ),
             num_workers=self.num_workers,
-            pin_memory=self.on_gpu
+            pin_memory=self.on_gpu,
         )
 
     def test_dataloader(self):
@@ -138,10 +139,10 @@ class Im2Latex100K(BaseDataModule):
             batch_sampler=BucketBatchSampler(
                 list((i, data_shape) for i, data_shape in enumerate(self.data_test.data_shape)),
                 self.batch_size,
-                shuffle=False
+                shuffle=False,
             ),
             num_workers=self.num_workers,
-            pin_memory=self.on_gpu
+            pin_memory=self.on_gpu,
         )
 
 
@@ -151,7 +152,7 @@ def _download_and_process_im2latex(vocab_filename, min_count: int = 10):
         if not (DL_DATA_DIRNAME / _metadata["filename"]).is_file():
             _download_raw_dataset(_metadata, DL_DATA_DIRNAME)
     _process_raw_dataset(metadata, vocab_filename, min_count=min_count)
-    
+
 
 def _process_raw_dataset(metadata: dict, vocab_filename: Union[Path, str], min_count: int = 10):
     # unzip tar file
@@ -160,13 +161,14 @@ def _process_raw_dataset(metadata: dict, vocab_filename: Union[Path, str], min_c
         print("Unzipping formula_images_processed.tar.gz...")
         with tarfile.open(img_tarfile, "r:gz") as tar_file:
             tar_file.extractall(PROCESSED_DATA_DIRNAME)
-    
+
     # move .lst files to PROCESSED_DATA_DIRNAME
     for _metadata in metadata.values():
-        if not (PROCESSED_DATA_DIRNAME / _metadata["filename"]).is_file() \
-            and (DL_DATA_DIRNAME / _metadata["filename"]).suffix == ".lst":
-            shutil.copy(DL_DATA_DIRNAME / _metadata["filename"],
-                        PROCESSED_DATA_DIRNAME / _metadata["filename"])
+        if (
+            not (PROCESSED_DATA_DIRNAME / _metadata["filename"]).is_file()
+            and (DL_DATA_DIRNAME / _metadata["filename"]).suffix == ".lst"
+        ):
+            shutil.copy(DL_DATA_DIRNAME / _metadata["filename"], PROCESSED_DATA_DIRNAME / _metadata["filename"])
 
     # save data.pkl
     if not PROCESSED_DATA_FILENAME.is_file():
@@ -190,9 +192,9 @@ def _process_raw_dataset(metadata: dict, vocab_filename: Union[Path, str], min_c
         }
         formulas = get_all_formulas(split_it=True)  # list of list of str
         for split in ["train", "validate", "test"]:
-            with open(get_list_filename(split), 'r') as f:
+            with open(get_list_filename(split), "r") as f:
                 for line in f:
-                    img_filename, idx = line.strip('\n').split()
+                    img_filename, idx = line.strip("\n").split()
                     formula = formulas[int(idx)]  # list of str
                     if len(formula) == 0:
                         pass
@@ -206,9 +208,9 @@ def _process_raw_dataset(metadata: dict, vocab_filename: Union[Path, str], min_c
             for img_array, img_size in result_iterator:
                 data_dict[f"x_{split}"].append(img_array)
                 data_dict[f"x_shape_{split}"].append(img_size)
-        
+
         print(f"Save the dictionary to {PROCESSED_DATA_FILENAME}...")
-        with open(PROCESSED_DATA_FILENAME, 'wb') as f:
+        with open(PROCESSED_DATA_FILENAME, "wb") as f:
             pickle.dump(data_dict, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     print("Build vocabulary...")
@@ -226,16 +228,15 @@ def _get_img_info(img_id: str):
 
 
 def get_all_formulas(
-    list_filename: Union[str, Path, None] = None,
-    split_it: bool = False
+    list_filename: Union[str, Path, None] = None, split_it: bool = False
 ) -> Union[List[List[str]], List[str]]:
     if list_filename is None:
         list_filename = PROCESSED_DATA_DIRNAME / "im2latex_formulas.norm.lst"
-    with open(list_filename, 'r') as f:
-        formulas = [formula.strip('\n') for formula in f.readlines()]
+    with open(list_filename, "r") as f:
+        formulas = [formula.strip("\n") for formula in f.readlines()]
     if split_it:
         formulas = list(map(str.split, formulas))
-    
+
     return formulas
 
 
@@ -257,11 +258,7 @@ def get_transform(augment: bool) -> transforms.Compose:
         transforms_list = [
             transforms.ToPILImage(),
             transforms.ColorJitter(brightness=(0.8, 1.6)),
-            transforms.RandomAffine(
-                degrees=1,
-                shear=(-10, 10),
-                interpolation=transforms.InterpolationMode.BILINEAR,
-            ),
+            transforms.RandomAffine(degrees=1, shear=(-10, 10), interpolation=transforms.InterpolationMode.BILINEAR,),
         ]
     else:
         transforms_list = []
@@ -274,7 +271,7 @@ class Im2LatexDataset(BaseDataset):
         self,
         data: SequenceOrTensor,
         targets: SequenceOrTensor,
-        data_shape: List[tuple], 
+        data_shape: List[tuple],
         transform: Callable = None,
         target_transform: Callable = None,
     ) -> None:
@@ -309,7 +306,7 @@ class BucketBatchSampler(Sampler):
         # e.g., for batch_size=3, batch_list = [[23,45,47], [49,50,62], [63,65,66], ...]
         batch_list = []
         for _, indices in batch_map.items():
-            for group in [indices[i:(i + self.batch_size)] for i in range(0, len(indices), self.batch_size)]:
+            for group in [indices[i : (i + self.batch_size)] for i in range(0, len(indices), self.batch_size)]:
                 batch_list.append(group)
         return batch_list
 
@@ -319,29 +316,29 @@ class BucketBatchSampler(Sampler):
     def __iter__(self):
         self.batch_list = self._generate_batch_map()
         # shuffle all the batches so they aren't ordered by bucket size
-        if self.shuffle: 
+        if self.shuffle:
             shuffle(self.batch_list)
         for i in self.batch_list:
             yield i
 
 
-def build_vocab(min_count: int=10) -> Sequence[str]:
+def build_vocab(min_count: int = 10) -> Sequence[str]:
     """Add the mapping with special symbols."""
     # listdir = Path(listdir)
     counter = Counter()
     vocab = []
 
     formulas = get_all_formulas(split_it=True)
-    with open(get_list_filename("train"), 'r') as f:
+    with open(get_list_filename("train"), "r") as f:
         for line in f:
-            _, idx = line.strip('\n').split()
+            _, idx = line.strip("\n").split()
             formula = formulas[int(idx)]
             counter.update(formula)
-    
+
     for word, count in counter.most_common():
         if count >= min_count:
             vocab.append(word)
-    
+
     # Also add special tokens:
     # - Unknown token at index 0
     # - Start token at index 1

@@ -51,7 +51,7 @@ class BaseLitModel(pl.LightningModule):  # pylint: disable=too-many-ancestors
         # self.train_acc = Accuracy()
         # self.val_acc = Accuracy()
         # self.test_acc = Accuracy()
-        
+
         self.mapping = self.model.data_config["mapping"]
         inverse_mapping = {val: ind for ind, val in enumerate(self.mapping)}
         start_index = inverse_mapping["<S>"]
@@ -114,6 +114,13 @@ class BaseLitModel(pl.LightningModule):  # pylint: disable=too-many-ancestors
 
         # self.val_acc(pred, y)
         # self.log("val_acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
+        # pred_str = [list(map(lambda x: self.mapping[x], ref.tolist())) for ref in pred]
+        # y_str = [list(map(lambda x: self.mapping[x], ref.tolist())) for ref in y]
+        # pred_str = [[self.mapping[_] for _ in pred[0].tolist()]]
+        # y_str = [[[self.mapping[_] for _ in y[0].tolist()]]]
+        # print(pred_str)
+        # print(y_str)
+        # print(pl.metrics.functional.nlp.bleu_score(pred_str, y_str))
         self.val_cer(pred, y)
         self.log("val_cer", self.val_cer, on_step=False, on_epoch=True, prog_bar=True)
 

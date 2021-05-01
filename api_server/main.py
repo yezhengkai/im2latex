@@ -15,6 +15,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Do not use GPU
 class ImageRequest(BaseModel):
     image: str
 
+
 class LatexResponse(BaseModel):
     pred: str
 
@@ -47,8 +48,7 @@ def predict(image_url: str = None):
 async def predict(json_request: ImageRequest):
     if not json_request.image.startswith("data:image/png;base64,"):
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="Add 'data:image/png;base64,' before base64 encoded string"
+            status.HTTP_400_BAD_REQUEST, detail="Add 'data:image/png;base64,' before base64 encoded string"
         )
     image = util.read_b64_image(json_request.image, grayscale=True)
     pred = model.predict(image)
@@ -60,5 +60,5 @@ async def predict(json_request: ImageRequest):
     return {"pred": str(pred)}
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
