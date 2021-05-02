@@ -1,6 +1,7 @@
 import argparse
-from typing import Any, Dict, Tuple, Union
 import math
+from typing import Any, Dict, Tuple, Union
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -122,7 +123,7 @@ class CNNLSTM(nn.Module):
             if logits:
                 tgt = torch.argmax(torch.log(logits[-1]), dim=1, keepdim=True)
             # ont step decoding
-            dec_states, O_t, logit = self.step_decoding(dec_states, o_t, encoded_imgs, tgt)
+            dec_states, _, logit = self.step_decoding(dec_states, o_t, encoded_imgs, tgt)
             logits.append(logit)
         logits = torch.stack(logits, dim=1)  # [B, MAX_LEN, VOCAB_SIZE]
         return logits.permute(0, 2, 1)  # (B, C, Sy)
@@ -148,7 +149,7 @@ class CNNLSTM(nn.Module):
         c_t = self.dropout(c_t)
 
         # context_t : [B, C]
-        context_t, attn_scores = self._get_attn(enc_out, h_t)
+        context_t, _ = self._get_attn(enc_out, h_t)
 
         # [B, dec_rnn_h]
         o_t = self.W_3(torch.cat([h_t, context_t], dim=1)).tanh()
