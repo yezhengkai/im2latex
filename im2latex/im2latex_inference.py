@@ -1,16 +1,16 @@
-from pathlib import Path
-from typing import Sequence, Union
 import argparse
 import json
+from pathlib import Path
+from typing import Sequence, Union
 
-from PIL import Image
 import torch
+from PIL import Image
 
+import im2latex.util as util
 from im2latex.data import Im2Latex100K
 from im2latex.data.im2latex_100k import get_transform
 from im2latex.lit_models import BaseLitModel
 from im2latex.models import CNNLSTM
-import im2latex.util as util
 
 CONFIG_AND_WEIGHTS_DIRNAME = Path(__file__).resolve().parent / "artifacts" / "im2latex"
 

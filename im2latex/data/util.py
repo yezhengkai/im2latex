@@ -1,7 +1,7 @@
 """Base Dataset class."""
 from typing import Any, Callable, Dict, Sequence, Tuple, Union
-import torch
 
+import torch
 
 SequenceOrTensor = Union[Sequence, torch.Tensor]
 

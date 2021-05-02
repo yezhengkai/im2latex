@@ -1,15 +1,15 @@
 """Utility functions for im2latex module."""
+import base64
+import hashlib
 from io import BytesIO
 from pathlib import Path
 from typing import Union
 from urllib.request import urlretrieve
-import base64
-import hashlib
 
-from PIL import Image
-from tqdm import tqdm
 import numpy as np
 import smart_open
+from PIL import Image
+from tqdm import tqdm
 
 
 def to_categorical(y, num_classes):

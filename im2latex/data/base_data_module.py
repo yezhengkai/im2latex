@@ -1,10 +1,10 @@
 """Base DataModule class."""
-from pathlib import Path
-from typing import Collection, Dict, Optional, Tuple, Union
 import argparse
+from pathlib import Path
+from typing import Collection, Dict, List, Optional, Tuple, Union
 
-from torch.utils.data import ConcatDataset, DataLoader
 import pytorch_lightning as pl
+from torch.utils.data import ConcatDataset, DataLoader
 
 from im2latex import util
 from im2latex.data.util import BaseDataset
@@ -54,7 +54,7 @@ class BaseDataModule(pl.LightningDataModule):
         self.on_gpu = isinstance(self.args.get("gpus", None), (str, int))
 
         # Make sure to set the variables below in subclasses
-        self.dims: Tuple[int, ...]
+        self.dims: Union[List[Tuple[int, ...]], Tuple[int, ...]]
         self.output_dims: Tuple[int, ...]
         self.mapping: Collection
         self.data_train: Union[BaseDataset, ConcatDataset]

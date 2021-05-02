@@ -3,12 +3,11 @@ import argparse
 import importlib
 
 import numpy as np
-import torch
 import pytorch_lightning as pl
+import torch
+
 import wandb
-
 from im2latex import lit_models
-
 
 # In order to ensure reproducible experiments, we must set random seeds.
 np.random.seed(42)

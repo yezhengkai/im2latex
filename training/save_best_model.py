@@ -10,14 +10,14 @@ To find entity and project, open any wandb run in web browser and look for the f
 "Run path" is of the format "<entity>/<project>/<run_id>".
 """
 import argparse
-import sys
-import shutil
 import json
-from pathlib import Path
+import shutil
+import sys
 import tempfile
+from pathlib import Path
 from typing import Optional, Union
-import wandb
 
+import wandb
 
 FILE_NAME = Path(__file__).resolve()
 ARTIFACTS_BASE_DIRNAME = FILE_NAME.parents[1] / "im2latex" / "artifacts"

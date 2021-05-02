@@ -1,8 +1,8 @@
 from typing import Sequence
 
+import editdistance
 import pytorch_lightning as pl
 import torch
-import editdistance
 
 
 class CharacterErrorRate(pl.metrics.Metric):
