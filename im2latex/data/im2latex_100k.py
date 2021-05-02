@@ -1,30 +1,51 @@
 """IM2LATEX100K DataModule"""
-from itertools import compress
-from collections import Counter, OrderedDict
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-import pickle
-from random import shuffle
-from typing import Callable, List, Sequence, Tuple, Union
-import json
 import argparse
+import json
+import pickle
 import shutil
 import tarfile
+from collections import Counter, OrderedDict
+from concurrent.futures import ThreadPoolExecutor
+from itertools import compress
+from pathlib import Path
+from random import shuffle
+from typing import Callable, List, MutableMapping, Sequence, Union
 
 import numpy as np
-from PIL import Image
-from torch.utils.data import Sampler
-from torch.utils.data import DataLoader
-from torchvision import transforms
 import toml
+from PIL import Image
+from torch.utils.data import DataLoader, Sampler
+from torchvision import transforms
 
-from im2latex.data.base_data_module import _download_raw_dataset, BaseDataModule, load_and_print_info
+from im2latex.data.base_data_module import BaseDataModule, _download_raw_dataset, load_and_print_info
 from im2latex.data.util import BaseDataset, SequenceOrTensor, convert_strings_to_labels
 
 IMAGE_HEIGHT = None
 IMAGE_WIDTH = None
 MAX_LABEL_LENGTH = 150
 MIN_COUNT = 10
+IMAGE_HIGHT_WIDTH_GROUP = [
+    (32, 128),
+    (64, 128),
+    (32, 160),
+    (64, 160),
+    (32, 192),
+    (64, 192),
+    (32, 224),
+    (64, 224),
+    (32, 256),
+    (64, 256),
+    (32, 320),
+    (64, 320),
+    (32, 384),
+    (64, 384),
+    (96, 384),
+    (32, 480),
+    (64, 480),
+    (128, 480),
+    (160, 480),
+]
+
 
 RAW_DATA_DIRNAME = BaseDataModule.data_dirname() / "raw" / "im2latex_100k"
 METADATA_FILENAME = RAW_DATA_DIRNAME / "metadata.toml"
@@ -36,6 +57,8 @@ PROCESSED_DATA_FILENAME = PROCESSED_DATA_DIRNAME / "data.pkl"
 # 1. implement __repr__
 # 2. add parameters to select normalization or raw latex
 # 3. rename function
+
+
 class Im2Latex100K(BaseDataModule):
     """
     Im2Latex100K DataModule.
@@ -56,7 +79,7 @@ class Im2Latex100K(BaseDataModule):
         self.mapping = list(vocab_dict["vocab"])  # label to string
         self.inverse_mapping = {v: k for k, v in enumerate(self.mapping)}  # string to label
 
-        self.dims = (1, IMAGE_HEIGHT, IMAGE_WIDTH)
+        self.dims = list(map(lambda x: (1, *x), IMAGE_HIGHT_WIDTH_GROUP))  # (1, IMAGE_HEIGHT, IMAGE_WIDTH)
         assert self.max_label_length <= MAX_LABEL_LENGTH
         self.output_dims = (MAX_LABEL_LENGTH, 1)
 
@@ -88,7 +111,11 @@ class Im2Latex100K(BaseDataModule):
 
         def _load_dataset(data_dict, split: str, augment: bool, max_label_length: int) -> BaseDataset:
             # https://stackoverflow.com/questions/13397385/python-filter-and-list-and-apply-filtered-indices-to-another-list
-            selectors = list(map(lambda y: not len(y) > max_label_length, data_dict[f"y_{split}"]))
+            selectors_length = list(map(lambda y: not len(y) > max_label_length, data_dict[f"y_{split}"]))
+            selectors_shape = list(
+                map(lambda hight_width: hight_width in IMAGE_HIGHT_WIDTH_GROUP, data_dict[f"x_shape_{split}"])
+            )
+            selectors = np.logical_and(selectors_length, selectors_shape)
             x = list(compress(data_dict[f"x_{split}"], selectors))
             y = list(compress(data_dict[f"y_{split}"], selectors))
             x_shape = list(compress(data_dict[f"x_shape_{split}"], selectors))
@@ -113,7 +140,7 @@ class Im2Latex100K(BaseDataModule):
             batch_sampler=BucketBatchSampler(
                 list((i, data_shape) for i, data_shape in enumerate(self.data_train.data_shape)),
                 self.batch_size,
-                shuffle=True,
+                do_shuffle=True,
             ),
             num_workers=self.num_workers,
             pin_memory=self.on_gpu,
@@ -126,7 +153,7 @@ class Im2Latex100K(BaseDataModule):
             batch_sampler=BucketBatchSampler(
                 list((i, data_shape) for i, data_shape in enumerate(self.data_val.data_shape)),
                 self.batch_size,
-                shuffle=False,
+                do_shuffle=False,
             ),
             num_workers=self.num_workers,
             pin_memory=self.on_gpu,
@@ -139,7 +166,7 @@ class Im2Latex100K(BaseDataModule):
             batch_sampler=BucketBatchSampler(
                 list((i, data_shape) for i, data_shape in enumerate(self.data_test.data_shape)),
                 self.batch_size,
-                shuffle=False,
+                do_shuffle=False,
             ),
             num_workers=self.num_workers,
             pin_memory=self.on_gpu,
@@ -154,7 +181,7 @@ def _download_and_process_im2latex(vocab_filename, min_count: int = 10):
     _process_raw_dataset(metadata, vocab_filename, min_count=min_count)
 
 
-def _process_raw_dataset(metadata: dict, vocab_filename: Union[Path, str], min_count: int = 10):
+def _process_raw_dataset(metadata: MutableMapping, vocab_filename: Union[Path, str], min_count: int = 10):
     # unzip tar file
     img_tarfile = DL_DATA_DIRNAME / metadata["formula_images_processed"]["filename"]
     if not (PROCESSED_DATA_DIRNAME / "formula_images_processed").is_dir():
@@ -176,7 +203,7 @@ def _process_raw_dataset(metadata: dict, vocab_filename: Union[Path, str], min_c
             "Save `array (from image)`, `latex`, `image size` and `image file name` to the dictionary "
             + "with the corresponding keys `x_{split}`, `y_{split}`, `x_shape_{split}` and `img_filename_{split}`..."
         )
-        data_dict = {
+        data_dict: dict = {
             "x_train": [],
             "x_validate": [],
             "x_test": [],
@@ -284,10 +311,10 @@ class Im2LatexDataset(BaseDataset):
 # https://discuss.pytorch.org/t/tensorflow-esque-bucket-by-sequence-length/41284/13
 class BucketBatchSampler(Sampler):
     # want inputs to be an array
-    def __init__(self, idx_imgsize, batch_size, shuffle=False):
+    def __init__(self, idx_imgsize, batch_size, do_shuffle=False):
         self.idx_imgsize = idx_imgsize
         self.batch_size = batch_size
-        self.shuffle = shuffle
+        self.shuffle = do_shuffle
         self.batch_list = self._generate_batch_map()
         self.num_batches = len(self.batch_list)
 
@@ -325,7 +352,7 @@ class BucketBatchSampler(Sampler):
 def build_vocab(min_count: int = 10) -> Sequence[str]:
     """Add the mapping with special symbols."""
     # listdir = Path(listdir)
-    counter = Counter()
+    counter: Counter = Counter()
     vocab = []
 
     formulas = get_all_formulas(split_it=True)
