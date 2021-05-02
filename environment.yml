@@ -8,7 +8,7 @@ dependencies:
   - cudatoolkit=11.1
   - pytorch=1.8.1
   - torchvision=0.9.1
-  - pytorch-lightning=1.2.6
+  - pytorch-lightning=1.2.10
   - smart_open
   - fastapi
   - uvicorn
