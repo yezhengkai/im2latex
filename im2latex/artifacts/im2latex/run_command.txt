@@ -1,0 +1,1 @@
+python training/run_experiment.py --max_epochs=30 --gpus=0, --wandb --num_workers=0 --model_class=ResnetTransformer --data_class=Im2Latex100K --batch_size=16
