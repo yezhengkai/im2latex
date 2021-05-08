@@ -111,14 +111,19 @@ class Im2Latex100K(BaseDataModule):
 
         def _load_dataset(data_dict, split: str, augment: bool, max_label_length: int) -> BaseDataset:
             # https://stackoverflow.com/questions/13397385/python-filter-and-list-and-apply-filtered-indices-to-another-list
-            selectors_length = list(map(lambda y: not len(y) > max_label_length, data_dict[f"y_{split}"]))
-            selectors_shape = list(
-                map(lambda hight_width: hight_width in IMAGE_HIGHT_WIDTH_GROUP, data_dict[f"x_shape_{split}"])
-            )
-            selectors = np.logical_and(selectors_length, selectors_shape)
-            x = list(compress(data_dict[f"x_{split}"], selectors))
-            y = list(compress(data_dict[f"y_{split}"], selectors))
-            x_shape = list(compress(data_dict[f"x_shape_{split}"], selectors))
+            if split in ["train", "validate"]:
+                selectors_length = list(map(lambda y: not len(y) > max_label_length, data_dict[f"y_{split}"]))
+                selectors_shape = list(
+                    map(lambda hight_width: hight_width in IMAGE_HIGHT_WIDTH_GROUP, data_dict[f"x_shape_{split}"])
+                )
+                selectors = np.logical_and(selectors_length, selectors_shape)
+                x = list(compress(data_dict[f"x_{split}"], selectors))
+                y = list(compress(data_dict[f"y_{split}"], selectors))
+                x_shape = list(compress(data_dict[f"x_shape_{split}"], selectors))
+            else:
+                x = data_dict[f"x_{split}"]
+                y = data_dict[f"y_{split}"]
+                x_shape = data_dict[f"x_shape_{split}"]
             y = convert_strings_to_labels(strings=y, mapping=self.inverse_mapping, length=self.output_dims[0] + 2)
             transform = get_transform(augment=augment)
             return Im2LatexDataset(x, y, x_shape, transform=transform)
