@@ -31,7 +31,6 @@ def read_image_pil_file(image_file, grayscale=False) -> Image:
         return image
 
 
-# Hide lines below until Lab 8
 def read_b64_image(b64_string, grayscale=False):  # pylint: disable=unused-argument
     """Load base64-encoded images."""
     try:
@@ -40,9 +39,6 @@ def read_b64_image(b64_string, grayscale=False):  # pylint: disable=unused-argum
         return read_image_pil_file(image_file, grayscale)
     except Exception as exception:
         raise ValueError("Could not load image from b64 {}: {}".format(b64_string, exception)) from exception
-
-
-# Hide lines above until Lab 8
 
 
 def compute_sha256(filename: Union[Path, str]):
