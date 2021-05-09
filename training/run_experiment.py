@@ -2,16 +2,13 @@
 import argparse
 import importlib
 
-import numpy as np
 import pytorch_lightning as pl
-import torch
 
 import wandb
 from im2latex import lit_models
 
 # In order to ensure reproducible experiments, we must set random seeds.
-np.random.seed(42)
-torch.manual_seed(42)
+pl.seed_everything(42, workers=True)
 
 
 def _import_class(module_and_class_name: str) -> type:
@@ -32,11 +29,9 @@ def _setup_parser():
     parser = argparse.ArgumentParser(add_help=False, parents=[trainer_parser])
 
     # Basic arguments
-    # Hide lines below until Lab 5
     parser.add_argument("--wandb", action="store_true", default=False)
-    # Hide lines above until Lab 5
     parser.add_argument("--data_class", type=str, default="Im2Latex100K")
-    parser.add_argument("--model_class", type=str, default="CNNLSTM")
+    parser.add_argument("--model_class", type=str, default="ResnetTransformer")
     parser.add_argument("--load_checkpoint", type=str, default=None)
 
     # Get the data and model classes, so that we can add their specific arguments
@@ -64,7 +59,7 @@ def main():
 
     Sample command:
     ```
-    python training/run_experiment.py --max_epochs=3 --gpus='0,' --num_workers=20 --model_class=MLP --data_class=MNIST
+    python training/run_experiment.py --max_epochs=3 --gpus='0,' --num_workers=0 --model_class=ResnetTransformer --data_class=Im2Latex100K
     ```
     """
     parser = _setup_parser()
@@ -74,17 +69,7 @@ def main():
     data = data_class(args)
     model = model_class(data_config=data.config(), args=args)
 
-    if args.loss not in ("ctc", "transformer"):
-        lit_model_class = lit_models.BaseLitModel
-        # lit_model_class = lit_models.Img2SeqModel
-    # Hide lines below until Lab 3
-    if args.loss == "ctc":
-        lit_model_class = lit_models.CTCLitModel
-    # Hide lines above until Lab 3
-    # Hide lines below until Lab 4
-    if args.loss == "transformer":
-        lit_model_class = lit_models.TransformerLitModel
-    # Hide lines above until Lab 4
+    lit_model_class = lit_models.BaseLitModel
 
     if args.load_checkpoint is not None:
         lit_model = lit_model_class.load_from_checkpoint(args.load_checkpoint, args=args, model=model)
@@ -92,16 +77,16 @@ def main():
         lit_model = lit_model_class(args=args, model=model)
 
     logger = pl.loggers.TensorBoardLogger("training/logs")
-    # Hide lines below until Lab 5
     if args.wandb:
         logger = pl.loggers.WandbLogger()
         logger.watch(model)
         logger.log_hyperparams(vars(args))
-    # Hide lines above until Lab 5
 
     early_stopping_callback = pl.callbacks.EarlyStopping(monitor="val_loss", mode="min", patience=10)
     model_checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        filename="{epoch:03d}-{val_loss:.3f}-{val_cer:.3f}", monitor="val_loss", mode="min"
+        filename="{epoch:03d}-{val_loss:.3f}-{val_bleu:.3f}-{val_cer:.3f}-{val_edit:.3f}",
+        monitor="val_loss",
+        mode="min",
     )
     callbacks = [early_stopping_callback, model_checkpoint_callback]
 
@@ -115,14 +100,12 @@ def main():
     trainer.test(lit_model, datamodule=data)
     # pylint: enable=no-member
 
-    # Hide lines below until Lab 5
     best_model_path = model_checkpoint_callback.best_model_path
     if best_model_path:
         print("Best model saved at:", best_model_path)
         if args.wandb:
             wandb.save(best_model_path)
             print("Best model also uploaded to W&B")
-    # Hide lines above until Lab 5
 
 
 if __name__ == "__main__":
