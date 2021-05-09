@@ -120,11 +120,13 @@ class Im2Latex100K(BaseDataModule):
                 x = list(compress(data_dict[f"x_{split}"], selectors))
                 y = list(compress(data_dict[f"y_{split}"], selectors))
                 x_shape = list(compress(data_dict[f"x_shape_{split}"], selectors))
+                y = convert_strings_to_labels(strings=y, mapping=self.inverse_mapping, length=self.output_dims[0] + 2)
             else:
                 x = data_dict[f"x_{split}"]
                 y = data_dict[f"y_{split}"]
                 x_shape = data_dict[f"x_shape_{split}"]
-            y = convert_strings_to_labels(strings=y, mapping=self.inverse_mapping, length=self.output_dims[0] + 2)
+                y_len = max(map(len, y))
+                y = convert_strings_to_labels(strings=y, mapping=self.inverse_mapping, length=y_len + 2)
             transform = get_transform(augment=augment)
             return Im2LatexDataset(x, y, x_shape, transform=transform)
 
