@@ -3,7 +3,12 @@ import argparse
 import pytorch_lightning as pl
 import torch
 
-from .metrics import CharacterErrorRate
+try:
+    import wandb
+except ModuleNotFoundError:
+    pass
+
+from .metrics import BleuScore, CharacterErrorRate, EditDistance
 
 OPTIMIZER = "Adam"
 LR = 3e-4
@@ -41,17 +46,8 @@ class BaseLitModel(pl.LightningModule):  # pylint: disable=too-many-ancestors
         self.optimizer_class = getattr(torch.optim, optimizer)
 
         self.lr = self.args.get("lr", LR)
-
-        # loss = self.args.get("loss", LOSS)
-        # if loss not in ("ctc", "transformer"):
-        #     self.loss_fn = getattr(torch.nn.functional, loss)
-
         self.one_cycle_max_lr = self.args.get("one_cycle_max_lr", None)
         self.one_cycle_total_steps = self.args.get("one_cycle_total_steps", ONE_CYCLE_TOTAL_STEPS)
-
-        # self.train_acc = Accuracy()
-        # self.val_acc = Accuracy()
-        # self.test_acc = Accuracy()
 
         self.mapping = self.model.data_config["mapping"]
         inverse_mapping = {val: ind for ind, val in enumerate(self.mapping)}
@@ -60,8 +56,15 @@ class BaseLitModel(pl.LightningModule):  # pylint: disable=too-many-ancestors
         padding_index = inverse_mapping["<P>"]
         ignore_tokens = [start_index, end_index, padding_index]
         self.loss_fn = torch.nn.CrossEntropyLoss(ignore_index=padding_index)
+
+        # validation metrics
+        self.val_bleu = BleuScore(ignore_tokens)
         self.val_cer = CharacterErrorRate(ignore_tokens)
+        self.val_edit = EditDistance(ignore_tokens)
+        # test metrics
+        self.test_bleu = BleuScore(ignore_tokens)
         self.test_cer = CharacterErrorRate(ignore_tokens)
+        self.test_edit = EditDistance(ignore_tokens)
 
     @staticmethod
     def add_to_argparse(parser):
@@ -82,59 +85,51 @@ class BaseLitModel(pl.LightningModule):  # pylint: disable=too-many-ancestors
         return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "val_loss"}
 
     def forward(self, x):
-        # return self.model(x)
         return self.model.predict(x)
 
     def training_step(self, batch, batch_idx):  # pylint: disable=unused-argument
         x, y = batch
-
-        # logits = self(x)
-        # loss = self.loss_fn(logits, y)
         logits = self.model(x, y[:, :-1])
         loss = self.loss_fn(logits, y[:, 1:])
-
         self.log("train_loss", loss)
-        # self.train_acc(torch.softmax(logits, dim=1), y)
-        # self.train_acc(logits, y)
-        # self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
         return loss
 
     def validation_step(self, batch, batch_idx):  # pylint: disable=unused-argument
         x, y = batch
-
-        # logits = self(x)
-        # loss = self.loss_fn(logits, y)
         logits = self.model(x, y[:, :-1])
-        # print(logits.shape)
         loss = self.loss_fn(logits, y[:, 1:])
         self.log("val_loss", loss, prog_bar=True)
 
-        # self.val_acc(torch.softmax(logits, dim=1), y)
-        # self.val_acc(logits, y)
         pred = self.model.predict(x)
+        pred_str = " ".join(self.mapping[_] for _ in pred[0].tolist() if _ != 3)  # 3 is padding token
+        try:
+            self.logger.experiment.log({"val_pred_examples": [wandb.Image(x[0], caption=pred_str)]})
+        except AttributeError:
+            pass
+        return {"loss": loss, "pred": pred, "y": y}
 
-        # self.val_acc(pred, y)
-        # self.log("val_acc", self.val_acc, on_step=False, on_epoch=True, prog_bar=True)
-        # pred_str = [list(map(lambda x: self.mapping[x], ref.tolist())) for ref in pred]
-        # y_str = [list(map(lambda x: self.mapping[x], ref.tolist())) for ref in y]
-        # pred_str = [[self.mapping[_] for _ in pred[0].tolist()]]
-        # y_str = [[[self.mapping[_] for _ in y[0].tolist()]]]
-        # print(pred_str)
-        # print(y_str)
-        # print(pl.metrics.functional.nlp.bleu_score(pred_str, y_str))
-        self.val_cer(pred, y)
+    def validation_step_end(self, outputs):
+        self.val_bleu(outputs["pred"], outputs["y"])
+        self.val_cer(outputs["pred"], outputs["y"])
+        self.val_edit(outputs["pred"], outputs["y"])
+        self.log("val_bleu", self.val_bleu, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val_cer", self.val_cer, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val_edit", self.val_edit, on_step=False, on_epoch=True, prog_bar=True)
 
     def test_step(self, batch, batch_idx):  # pylint: disable=unused-argument
         x, y = batch
-
-        # logits = self(x)
-        # self.test_acc(torch.softmax(logits, dim=1), y)
         pred = self.model.predict(x)
-        # self.test_acc(pred, y)
-        # self.test_acc(logits, y)
-        # self.log("test_acc", self.test_acc, on_step=False, on_epoch=True)
-        # print(f"pred: {pred}")
-        # print(f"y: {y}")
-        self.test_cer(pred, y)
+        pred_str = " ".join(self.mapping[_] for _ in pred[0].tolist() if _ != 3)  # 3 is padding token
+        try:
+            self.logger.experiment.log({"test_pred_examples": [wandb.Image(x[0], caption=pred_str)]})
+        except AttributeError:
+            pass
+        return {"pred": pred, "y": y}
+
+    def test_step_end(self, outputs):
+        self.test_bleu(outputs["pred"], outputs["y"])
+        self.test_cer(outputs["pred"], outputs["y"])
+        self.test_edit(outputs["pred"], outputs["y"])
+        self.log("test_bleu", self.test_bleu, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test_cer", self.test_cer, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("test_edit", self.test_edit, on_step=False, on_epoch=True, prog_bar=True)
