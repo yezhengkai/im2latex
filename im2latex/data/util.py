@@ -1,6 +1,8 @@
 """Base Dataset class."""
+import random
 from typing import Any, Callable, Dict, Sequence, Tuple, Union
 
+import numpy as np
 import torch
 
 SequenceOrTensor = Union[Sequence, torch.Tensor]
@@ -78,7 +80,6 @@ def convert_strings_to_labels(strings: Sequence[str], mapping: Dict[str, int], l
         tokens = ["<S>", *tokens, "<E>"]
         for ii, token in enumerate(tokens):
             labels[i, ii] = mapping.get(token, 0)  # unknown token: 0
-        # labels[i, ii] = mapping[token]
     return labels
 
 
@@ -92,3 +93,11 @@ def split_dataset(base_dataset: BaseDataset, fraction: float, seed: int) -> Tupl
     return torch.utils.data.random_split(  # type: ignore
         base_dataset, [split_a_size, split_b_size], generator=torch.Generator().manual_seed(seed)
     )
+
+
+# https://pytorch-lightning.readthedocs.io/en/stable/api/pytorch_lightning.utilities.seed.html
+# https://pytorch.org/docs/stable/notes/randomness.html#dataloader
+def seed_worker(worker_id):  # pylint: disable=unused-argument
+    worker_seed = torch.initial_seed() % 2 ** 32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
