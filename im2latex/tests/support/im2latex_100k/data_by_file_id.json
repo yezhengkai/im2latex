@@ -1,0 +1,17 @@
+{
+    "7944775fc9": {
+        "ground_truth_text": "\\alpha _ { 1 } ^ { r } \\gamma _ { 1 } + \\dots + \\alpha _ { N } ^ { r } \\gamma _ { N } = 0 \\quad ( r = 1 , . . . , R ) \\; ,",
+        "predicted_text": "\\alpha _ { 1 } ^ { \\gamma } \\gamma _ { 1 } + . . . + \\alpha _ { N } ^ { \\gamma } \\gamma _ { N } = 0 \\quad ( r = 1 , . . , R ) \\, ,",
+        "character_error_rate": 0.111
+    },
+    "566cf0c6f5": {
+        "ground_truth_text": "\\dot { z } _ { 1 } = - N ^ { z } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \\frac { z _ { 1 } } { P _ { z } ( z _ { 2 } - z _ { 1 } ) } ; ~ ~ ~ \\dot { z } _ { 2 } = - \\frac { z _ { 2 } } { P _ { z } ( z _ { 2 } - z _ { 1 } ) }",
+        "predicted_text": "\\dot { z } _ { 1 } = - N ^ { z } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \\frac { z _ { 1 } } { z _ { 2 } ( z _ { 2 } - z _ { 1 } ) } ; \\quad \\dot { z } _ { 2 } = - \\frac { z _ { 2 } } { \\bar { z } _ { z } ( z _ { 2 } - z _ { 1 } ) }",
+        "character_error_rate": 0.074
+    },
+    "4c0185889d": {
+        "ground_truth_text": "{ \\cal L } ( J ) = \\frac { 1 } { 2 } \\partial _ { \\mu } \\phi \\partial ^ { \\mu } \\phi + \\frac { J } { 2 } \\phi ^ { 2 } + \\frac { \\lambda \\mu ^ { 2 \\varepsilon } } { 4 ! } \\phi ^ { 4 } + { \\cal L } _ { \\mathrm { C T } } ( J ) - \\mu ^ { - 2 \\varepsilon } \\frac { \\zeta } { 2 } \\; J ^ { 2 } .",
+        "predicted_text": "{ \\cal L } ( J ) = \\frac { 1 } { 2 } \\partial _ { \\mu } \\phi \\partial ^ { \\mu } \\phi + \\frac { 1 } { 2 } \\phi ^ { 2 } + \\frac { \\lambda \\mu ^ { 2 } } { 4 ! } \\phi ^ { 4 } + { \\cal L } _ { \\mathrm { C T } } ( J ) - \\mu ^ { 2 } \\frac { \\xi } { 2 } \\, J ^ { 2 } .",
+        "character_error_rate": 0.154
+    }
+}
