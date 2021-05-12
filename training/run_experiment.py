@@ -1,6 +1,8 @@
 """Experiment-running framework."""
 import argparse
 import importlib
+import os
+import shutil
 
 import pytorch_lightning as pl
 
@@ -8,6 +10,7 @@ import wandb
 from im2latex import lit_models
 
 # In order to ensure reproducible experiments, we must set random seeds.
+# https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#reproducibility
 pl.seed_everything(42, workers=True)
 
 
@@ -104,6 +107,14 @@ def main():
     if best_model_path:
         print("Best model saved at:", best_model_path)
         if args.wandb:
+            # https://github.com/wandb/client/issues/1370
+            wandb_ckpt_dir = os.path.join(
+                wandb.run.dir, "training", "logs", wandb.run.project, wandb.run.id, "checkpoints"
+            )
+            os.makedirs(wandb_ckpt_dir, exist_ok=True)
+            shutil.copy(
+                best_model_path, os.path.join(wandb_ckpt_dir, os.path.basename(best_model_path),),
+            )
             wandb.save(best_model_path)
             print("Best model also uploaded to W&B")
 
