@@ -2,6 +2,7 @@ name: im2latex
 channels:
   - defaults
   - pytorch
+  - nvidia
   - conda-forge
 dependencies:
   - python=3.8
@@ -16,7 +17,8 @@ dependencies:
   - editdistance
   - toml
   ## dev
-  - wandb
+  # wandb issue: https://discuss.pytorch.org/t/runtimeerror-module-backward-hook-for-grad-input-is-called-before-the-grad-output-one-this-happens-because-the-gradient-in-your-nn-m-odule-flows-to-the-modules-input-without-passing-through-the-modules-output/119763/8
+  - wandb=0.10.20
   - jupyterlab
   - matplotlib
   # test
