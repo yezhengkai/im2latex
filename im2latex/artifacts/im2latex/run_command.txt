@@ -1,1 +1,1 @@
-python training/run_experiment.py --max_epochs=30 --gpus=0, --wandb --num_workers=0 --model_class=ResnetTransformer --data_class=Im2Latex100K --batch_size=16
+python training/run_experiment.py --wandb --batch_size=64 --data_class=Im2Latex100K --gpus=-1 --lr=0.0001 --model_class=ResnetTransformer --num_workers=0 --precision=16 --tf_dim=256 --tf_dropout=0.4 --tf_fc_dim=1024 --tf_layers=4 --tf_nhead=8
