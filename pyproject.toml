@@ -14,4 +14,3 @@ skip_gitignore = true
 minversion = "6.0"
 filterwarnings = "ignore::DeprecationWarning"
 testpaths = ["tests"]
-addopts = ["--numprocesses=auto", "--doctest-modules"]
