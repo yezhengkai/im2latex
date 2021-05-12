@@ -23,11 +23,11 @@ class TestEvaluateIm2LatexInference(unittest.TestCase):
         dataset.prepare_data()
         dataset.setup()
 
-        inference = Im2LatexInference()
+        reasoner = Im2LatexInference()
         trainer = pl.Trainer(gpus=1)
 
         start_time = time.time()
-        metrics = trainer.test(inference.lit_model, datamodule=dataset)
+        metrics = trainer.test(reasoner.lit_model, datamodule=dataset)
         end_time = time.time()
 
         test_bleu = round(metrics[0]["test_bleu"], 4)
