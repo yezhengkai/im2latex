@@ -47,10 +47,19 @@ def save_best_model():
     best_run = sorted_runs[0]
     summary = best_run.summary
     print(f"Best run ({best_run.name}, {best_run.id}) picked from {len(runs)} runs with the following metrics:")
-    print(summary)
-    # print(f" - val_loss: {summary['val_loss']}, val_cer: {summary['val_cer']}, test_cer: {summary['test_cer']}")
+    print(
+        (
+            f" - val_loss: {summary['val_loss']}\n"
+            f" - val_bleu: {summary['val_bleu']}\n"
+            f" - val_cer: {summary['val_cer']}\n"
+            f" - val_edit: {summary['val_edit']}\n"
+            f" - test_bleu: {summary['test_bleu']}\n"
+            f" - test_cer: {summary['test_cer']}\n"
+            f" - test_edit: {summary['test_edit']}"
+        )
+    )
 
-    artifacts_dirname = _get_artifacts_dirname(args.trained_data_class)
+    artifacts_dirname = _get_artifacts_dirname()
     with open(artifacts_dirname / "config.json", "w") as file:
         json.dump(best_run.config, file, indent=4)
     with open(artifacts_dirname / "run_command.txt", "w") as file:
@@ -58,9 +67,9 @@ def save_best_model():
     _save_model_weights(wandb_run=best_run, project=args.project, output_dirname=artifacts_dirname)
 
 
-def _get_artifacts_dirname(trained_data_class: str) -> Path:
+def _get_artifacts_dirname() -> Path:
     """Return artifacts dirname."""
-    artifacts_dirname = ARTIFACTS_BASE_DIRNAME / f"im2latex"
+    artifacts_dirname = ARTIFACTS_BASE_DIRNAME / "im2latex"
     artifacts_dirname.mkdir(parents=True, exist_ok=True)
     return artifacts_dirname
 
