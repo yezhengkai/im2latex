@@ -19,3 +19,4 @@ wandb
 
 # Misc
 .mypy_cache
+lightning_logs/
