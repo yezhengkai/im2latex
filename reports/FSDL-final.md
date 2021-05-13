@@ -6,8 +6,10 @@
     - [Linter and Formatter](#linter-and-formatter)
     - [Data Management](#data-management)
     - [Model Architecture](#model-architecture)
-    - [Training](#training)
+    - [Train](#train)
+    - [Evaluate](#evaluate)
     - [Deployment](#deployment)
+    - [Code Test](#code-test)
   - [Results](#results)
     - [Example 1](#example-1)
     - [Example 2](#example-2)
@@ -44,10 +46,9 @@ In addition, since the OS of the local machine is Windows, I wrote a batch file 
 - black
 - isort
 
-Linters are a good tool for finding potential errors in the code, and `mypy` can help us complete static type hinting, which is essential for compiling models into Torchscript.
+Linters are a good tool for finding potential errors in the code, and `mypy` can help us complete static type hinting, which is essential for compiling models into [Torchscript](https://pytorch.org/docs/stable/jit.html).
 
 If the team develops the code together, the formatter can easily unify the code style.
-
 
 ### Data Management
 - pytorch + pytorch-lightning
@@ -60,29 +61,51 @@ In order to read images of different sizes in batches, I created a `BucketBatchS
 - pytorch + pytorch-lightning
 
 Since I am not familiar with the seq2seq model, I first adjusted the seq2seq (CNN encoder + LSTM decoder with Attention) model from the [luopeixiang/im2latex](https://github.com/luopeixiang/im2latex) repository. 
-The CNN + LSTM model is slightly different from the original [paper](http://lstm.seas.harvard.edu/latex/), and the LSTM part makes its training slower. Therefore, I turned to using the ResnetTransformer from the [full-stack-deep-learning/fsdl-text-recognizer-2021-labs](https://github.com/full-stack-deep-learning/fsdl-text-recognizer-2021-labs) repository.
+The CNN + LSTM model is slightly different from the original [paper](https://arxiv.org/pdf/1609.04938v1.pdf), and the LSTM part makes its training slower. Therefore, I turned to using the `ResnetTransformer` from the [full-stack-deep-learning/fsdl-text-recognizer-2021-labs](https://github.com/full-stack-deep-learning/fsdl-text-recognizer-2021-labs) repository.
 
-
-### Training
+### Train
 - pytorch + pytorch-lightning
 - Weights & Biases
 
+With pytorch-lightning, we can conveniently organize model training/validation/test step ([im2latex/lit_models/base.py](../im2latex/lit_models/base.py)), and integrate CLI arguments, Weights & Biases logger, etc. ([training/run_experiment.py](../training/run_experiment.py)). Then, use `wandb sweep training/sweeps/im2latex_100k_resnet_transformer.yml` to create hyperparameter search session on the Weights & Biases. The "Sweep" results can be found in my [**W&B dashboard**](https://wandb.ai/zhengkai/im2latex). We can see the details of each run with different hyperparameter combinations. From the "Sweep" results, the performance of the large model is better than that of the small model. The decrease of "val_loss" each run follows a similar pattern, which shows that we set the random seed correctly. What surprised me during the "Sweep" was that the Bayesian hyperparameter search process used the same parameters at sweep-5 and sweep-6. Maybe random search can prevent similar situations.
+
 I also tried the service provided by [grid.ai](https://www.grid.ai/), but I need to change the existing code or folder structure to use it. Due to time constraints, only Weights & Biases is used at this stage.
 
+### Evaluate
+- pytorch + pytorch-lightning
+
+Note that I evaluated the text metrics in the entire test dataset, so the evaluation process may be different from other implementations. And I only use greedy decoding, so the result may not be as good as beam search decoding.
+
+| Model                                                                      | BLEU  | Edit Distance |
+| -------------------------------------------------------------------------- | ----- | ------------- |
+| [Paper's WYGIWYS](https://arxiv.org/pdf/1609.04938v1.pdf)                  | 87.73 |               |
+| [luopeixiang/im2latex's CNN+LSTM](https://github.com/luopeixiang/im2latex) | 40.80 | 44.23         |
+| ResnetTransformer                                                          | 59.51 | 65.95         |
+
+In the BLEU metric, our model reached 68% of the performance of the paper's model.
+
 ### Deployment
+- pytorch + pytorch-lightning
 - fastapi
 - uvicorn
 - docker
 
-For deployment, I referred to the implementation of[full-stack-deep-learning/fsdl-text-recognizer-2021-labs](https://github.com/full-stack-deep-learning/fsdl-text-recognizer-2021-labs) and changes `flask` to `fastapi + uvicorn`.
-In order to make our api server easy to deploy to other machines, I used docker to create a container to run our api server.
+For deployment, I referred to the implementation of [full-stack-deep-learning/fsdl-text-recognizer-2021-labs](https://github.com/full-stack-deep-learning/fsdl-text-recognizer-2021-labs) and changes `flask` to `fastapi + uvicorn`.
+In order to make our api server easy to deploy to other machines, here we use docker to create a container to run our api server. To speed up the inference time, we also converted pytorch model to [TorchScript](https://pytorch.org/docs/stable/jit.html).
 
+Server provide a GET method in the "/v1/predict" path so that users can send "image_url" query parameter. Then, server will read image from the URL and return json with `pred` key. Users can also upload base64-encoded images to the server through POST requests.
+
+### Code Test
+- pytest
+
+I wrote [inference tests](../im2latex/tests/test_im2latex_inference.py) and [evaluation tests](../im2latex/evaluation/evaluate_im2latex_inference.py) to test whether the inferred Latex and evaluation metrics meet our expectations.
 
 ## Results
 Now we test our model with images from test dataset.
 
 ### Example 1
 - Input Image:
+
   <img src=./images/7944775fc9.png alt="\alpha _ { 1 } ^ { r } \gamma _ { 1 } + \dots + \alpha _ { N } ^ { r } \gamma _ { N } = 0 \quad ( r = 1 , . . . , R ) \; ," style="display:block; margin:auto;" />
 
 - Target Latex:
@@ -92,15 +115,17 @@ Now we test our model with images from test dataset.
 
 - Inferred Latex:
   ```
-  \alpha_{r}^{\prime}\gamma_{1}+\ldots+\alpha_{r}^{\prime}\gamma_{N}=0\quad(r=1,\ldots,R)\;,
+  \alpha _ { 1 } ^ { \gamma } \gamma _ { 1 } + . . . + \alpha _ { N } ^ { \gamma } \gamma _ { N } = 0 \quad ( r = 1 , . . , R ) \, ,
   ```
 
 - Render Inferred Latex
-  $$\alpha_{r}^{\prime}\gamma_{1}+\ldots+\alpha_{r}^{\prime}\gamma_{N}=0\quad(r=1,\ldots,R)\;,$$
+  
+  <img src="https://latex.codecogs.com/svg.latex?\alpha _ { 1 } ^ { \gamma } \gamma _ { 1 } + . . . + \alpha _ { N } ^ { \gamma } \gamma _ { N } = 0 \quad ( r = 1 , . . , R ) \, ," alt="\alpha _ { 1 } ^ { \gamma } \gamma _ { 1 } + . . . + \alpha _ { N } ^ { \gamma } \gamma _ { N } = 0 \quad ( r = 1 , . . , R ) \, ," style="display:block; margin:auto;" />
 
 
 ### Example 2
 - Input Image:
+
   <img src=./images/566cf0c6f5.png alt="\dot { z } _ { 1 } = - N ^ { z } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \frac { z _ { 1 } } { P _ { z } ( z _ { 2 } - z _ { 1 } ) } ; ~ ~ ~ \dot { z } _ { 2 } = - \frac { z _ { 2 } } { P _ { z } ( z _ { 2 } - z _ { 1 } ) }"  style="display:block; margin:auto;" />
 
 - Target Latex:
@@ -110,14 +135,17 @@ Now we test our model with images from test dataset.
 
 - Inferred Latex:
   ```
-  \dot { z } _ { 1 } = - N ^ { 4 } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \frac { z _ { 1 } } { F _ { 2 } ( z _ { 2 } - z _ { 1 } ) } , \quad \dot { z } _ { 2 } = - \frac { z _ { 2 } } { F _ { 2 } ( z _ { 2 } - z _ { 1 } ) }
+  \dot { z } _ { 1 } = - N ^ { z } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \frac { z _ { 1 } } { z _ { 2 } ( z _ { 2 } - z _ { 1 } ) } ; \quad \dot { z } _ { 2 } = - \frac { z _ { 2 } } { \bar { z } _ { z } ( z _ { 2 } - z _ { 1 } ) }
   ```
 
 - Render Inferred Latex:
-  $$\dot { z } _ { 1 } = - N ^ { 4 } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \frac { z _ { 1 } } { F _ { 2 } ( z _ { 2 } - z _ { 1 } ) } , \quad \dot { z } _ { 2 } = - \frac { z _ { 2 } } { F _ { 2 } ( z _ { 2 } - z _ { 1 } ) }$$
+
+  <img src="https://latex.codecogs.com/svg.latex?\dot { z } _ { 1 } = - N ^ { z } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \frac { z _ { 1 } } { z _ { 2 } ( z _ { 2 } - z _ { 1 } ) } ; \quad \dot { z } _ { 2 } = - \frac { z _ { 2 } } { \bar { z } _ { z } ( z _ { 2 } - z _ { 1 } ) }" alt="\dot { z } _ { 1 } = - N ^ { z } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \frac { z _ { 1 } } { z _ { 2 } ( z _ { 2 } - z _ { 1 } ) } ; \quad \dot { z } _ { 2 } = - \frac { z _ { 2 } } { \bar { z } _ { z } ( z _ { 2 } - z _ { 1 } ) }" style="display:block; margin:auto;" />
+
 
 ### Example 3
 - Input Image:
+
   <img src=./images/4c0185889d.png alt="\dot { z } _ { 1 } = - N ^ { z } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \frac { z _ { 1 } } { P _ { z } ( z _ { 2 } - z _ { 1 } ) } ; ~ ~ ~ \dot { z } _ { 2 } = - \frac { z _ { 2 } } { P _ { z } ( z _ { 2 } - z _ { 1 } ) }"  style="display:block; margin:auto;" />
 
 - Target Latex:
@@ -127,16 +155,12 @@ Now we test our model with images from test dataset.
 
 - Inferred Latex:
   ```
-  { \cal L } ( J ) = \frac { 1 } { 2 } \partial _ { \mu } \phi \partial ^ { \mu } \phi + \frac { J } { 2 } \phi ^ { 2 } + \frac { \lambda \mu ^ { 2 x } } { 4 ! } \phi ^ { 4 } + { \cal L } _ { C \Gamma } ( J ) - \mu ^ { - 2 } \frac { \zeta } { 2 } } f ^ { 4 } ( x ) - \mu ^ { - 2 } \frac { \zeta } { 2 } f ( x ) = ( t ) .
+  { \cal L } ( J ) = \frac { 1 } { 2 } \partial _ { \mu } \phi \partial ^ { \mu } \phi + \frac { 1 } { 2 } \phi ^ { 2 } + \frac { \lambda \mu ^ { 2 } } { 4 ! } \phi ^ { 4 } + { \cal L } _ { \mathrm { C T } } ( J ) - \mu ^ { 2 } \frac { \xi } { 2 } \, J ^ { 2 } .
   ```
 
 - Render Inferred Latex:
-  
-  We get Latex that cannot be parsed because of the extra "}"
-  $${ \cal L } ( J ) = \frac { 1 } { 2 } \partial _ { \mu } \phi \partial ^ { \mu } \phi + \frac { J } { 2 } \phi ^ { 2 } + \frac { \lambda \mu ^ { 2 x } } { 4 ! } \phi ^ { 4 } + { \cal L } _ { C \Gamma } ( J ) - \mu ^ { - 2 } \frac { \zeta } { 2 } } f ^ { 4 } ( x ) - \mu ^ { - 2 } \frac { \zeta } { 2 } f ( x ) = ( t ) .$$
-  
-  If we manually delete "}", we will get the following result:
-  $${ \cal L } ( J ) = \frac { 1 } { 2 } \partial _ { \mu } \phi \partial ^ { \mu } \phi + \frac { J } { 2 } \phi ^ { 2 } + \frac { \lambda \mu ^ { 2 x } } { 4 ! } \phi ^ { 4 } + { \cal L } _ { C \Gamma } ( J ) - \mu ^ { - 2 } \frac { \zeta } { 2 }  f ^ { 4 } ( x ) - \mu ^ { - 2 } \frac { \zeta } { 2 } f ( x ) = ( t ) .$$
+
+  <img src="https://latex.codecogs.com/svg.latex?{ \cal L } ( J ) = \frac { 1 } { 2 } \partial _ { \mu } \phi \partial ^ { \mu } \phi + \frac { 1 } { 2 } \phi ^ { 2 } + \frac { \lambda \mu ^ { 2 } } { 4 ! } \phi ^ { 4 } + { \cal L } _ { \mathrm { C T } } ( J ) - \mu ^ { 2 } \frac { \xi } { 2 } \, J ^ { 2 } ." alt="{ \cal L } ( J ) = \frac { 1 } { 2 } \partial _ { \mu } \phi \partial ^ { \mu } \phi + \frac { 1 } { 2 } \phi ^ { 2 } + \frac { \lambda \mu ^ { 2 } } { 4 ! } \phi ^ { 4 } + { \cal L } _ { \mathrm { C T } } ( J ) - \mu ^ { 2 } \frac { \xi } { 2 } \, J ^ { 2 } ." style="display:block; margin:auto;" />
 
 
 ## Conclusion
