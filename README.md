@@ -74,7 +74,7 @@ Under the project root directory, run
 pytest -s ./im2latex/evaluation/evaluate_im2latex_inference.py
 ```
 
-## App server tests
+## API server tests
 Under the project root directory, run
 ```bash
 pytest -s api_server/tests/test_app.py
