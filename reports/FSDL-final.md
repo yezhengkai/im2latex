@@ -98,7 +98,7 @@ Server provide a GET method in the "/v1/predict" path so that users can send "im
 ### Code Test
 - pytest
 
-I wrote [inference tests](../im2latex/tests/test_im2latex_inference.py) and [evaluation tests](../im2latex/evaluation/evaluate_im2latex_inference.py) to test whether the inferred Latex and evaluation metrics meet our expectations.
+I wrote [inference tests](../im2latex/tests/test_im2latex_inference.py), [evaluation tests](../im2latex/evaluation/evaluate_im2latex_inference.py) and [api tests](../api_server/tests/test_app.py) to test whether the inferred Latex and evaluation metrics meet our expectations and the server is working properly.
 
 ## Results
 Now we test our model with images from test dataset.
@@ -120,7 +120,7 @@ Now we test our model with images from test dataset.
 
 - Render Inferred Latex
   
-  <img src="https://latex.codecogs.com/svg.latex?\alpha _ { 1 } ^ { \gamma } \gamma _ { 1 } + . . . + \alpha _ { N } ^ { \gamma } \gamma _ { N } = 0 \quad ( r = 1 , . . , R ) \, ," alt="\alpha _ { 1 } ^ { \gamma } \gamma _ { 1 } + . . . + \alpha _ { N } ^ { \gamma } \gamma _ { N } = 0 \quad ( r = 1 , . . , R ) \, ," style="display:block; margin:auto;" />
+  <img src="https://latex.codecogs.com/svg.latex?\alpha%20_%20{%201%20}%20^%20{%20\gamma%20}%20\gamma%20_%20{%201%20}%20+%20.%20.%20.%20+%20\alpha%20_%20{%20N%20}%20^%20{%20\gamma%20}%20\gamma%20_%20{%20N%20}%20=%200%20\quad%20(%20r%20=%201%20,%20.%20.%20,%20R%20)%20\,%20," alt="\alpha _ { 1 } ^ { \gamma } \gamma _ { 1 } + . . . + \alpha _ { N } ^ { \gamma } \gamma _ { N } = 0 \quad ( r = 1 , . . , R ) \, ," style="display:block; margin:auto;" />
 
 
 ### Example 2
@@ -140,7 +140,7 @@ Now we test our model with images from test dataset.
 
 - Render Inferred Latex:
 
-  <img src="https://latex.codecogs.com/svg.latex?\dot { z } _ { 1 } = - N ^ { z } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \frac { z _ { 1 } } { z _ { 2 } ( z _ { 2 } - z _ { 1 } ) } ; \quad \dot { z } _ { 2 } = - \frac { z _ { 2 } } { \bar { z } _ { z } ( z _ { 2 } - z _ { 1 } ) }" alt="\dot { z } _ { 1 } = - N ^ { z } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \frac { z _ { 1 } } { z _ { 2 } ( z _ { 2 } - z _ { 1 } ) } ; \quad \dot { z } _ { 2 } = - \frac { z _ { 2 } } { \bar { z } _ { z } ( z _ { 2 } - z _ { 1 } ) }" style="display:block; margin:auto;" />
+  <img src="https://latex.codecogs.com/svg.latex?\dot%20{%20z%20}%20_%20{%201%20}%20=%20-%20N%20^%20{%20z%20}%20(%20z%20_%20{%201%20}%20)%20=%20-%20g%20(%20z%20_%20{%201%20}%20)%20=%20-%20\frac%20{%20z%20_%20{%201%20}%20}%20{%20z%20_%20{%202%20}%20(%20z%20_%20{%202%20}%20-%20z%20_%20{%201%20}%20)%20}%20;%20\quad%20\dot%20{%20z%20}%20_%20{%202%20}%20=%20-%20\frac%20{%20z%20_%20{%202%20}%20}%20{%20\bar%20{%20z%20}%20_%20{%20z%20}%20(%20z%20_%20{%202%20}%20-%20z%20_%20{%201%20}%20)%20}" alt="\dot { z } _ { 1 } = - N ^ { z } ( z _ { 1 } ) = - g ( z _ { 1 } ) = - \frac { z _ { 1 } } { z _ { 2 } ( z _ { 2 } - z _ { 1 } ) } ; \quad \dot { z } _ { 2 } = - \frac { z _ { 2 } } { \bar { z } _ { z } ( z _ { 2 } - z _ { 1 } ) }" style="display:block; margin:auto;" />
 
 
 ### Example 3
@@ -160,9 +160,9 @@ Now we test our model with images from test dataset.
 
 - Render Inferred Latex:
 
-  <img src="https://latex.codecogs.com/svg.latex?{ \cal L } ( J ) = \frac { 1 } { 2 } \partial _ { \mu } \phi \partial ^ { \mu } \phi + \frac { 1 } { 2 } \phi ^ { 2 } + \frac { \lambda \mu ^ { 2 } } { 4 ! } \phi ^ { 4 } + { \cal L } _ { \mathrm { C T } } ( J ) - \mu ^ { 2 } \frac { \xi } { 2 } \, J ^ { 2 } ." alt="{ \cal L } ( J ) = \frac { 1 } { 2 } \partial _ { \mu } \phi \partial ^ { \mu } \phi + \frac { 1 } { 2 } \phi ^ { 2 } + \frac { \lambda \mu ^ { 2 } } { 4 ! } \phi ^ { 4 } + { \cal L } _ { \mathrm { C T } } ( J ) - \mu ^ { 2 } \frac { \xi } { 2 } \, J ^ { 2 } ." style="display:block; margin:auto;" />
+  <img src="https://latex.codecogs.com/svg.latex?{%20\cal%20L%20}%20(%20J%20)%20=%20\frac%20{%201%20}%20{%202%20}%20\partial%20_%20{%20\mu%20}%20\phi%20\partial%20^%20{%20\mu%20}%20\phi%20+%20\frac%20{%201%20}%20{%202%20}%20\phi%20^%20{%202%20}%20+%20\frac%20{%20\lambda%20\mu%20^%20{%202%20}%20}%20{%204%20!%20}%20\phi%20^%20{%204%20}%20+%20{%20\cal%20L%20}%20_%20{%20\mathrm%20{%20C%20T%20}%20}%20(%20J%20)%20-%20\mu%20^%20{%202%20}%20\frac%20{%20\xi%20}%20{%202%20}%20\,%20J%20^%20{%202%20}%20." alt="{ \cal L } ( J ) = \frac { 1 } { 2 } \partial _ { \mu } \phi \partial ^ { \mu } \phi + \frac { 1 } { 2 } \phi ^ { 2 } + \frac { \lambda \mu ^ { 2 } } { 4 ! } \phi ^ { 4 } + { \cal L } _ { \mathrm { C T } } ( J ) - \mu ^ { 2 } \frac { \xi } { 2 } \, J ^ { 2 } ." style="display:block; margin:auto;" />
 
 
 ## Conclusion
-Maybe we can add the restriction to force parentheses must be paired.
 
+The im2latex prototype workflow has been completed at this stage, but there is still a lot of work to be done. For example, use data version control tools (DVC), integrate CI/CD (Github Actions), using a more appropriate model (forcing the model to return paired brackets) and create web app, etc. In any case, we have completed the minimum requirements for machine learning products.
