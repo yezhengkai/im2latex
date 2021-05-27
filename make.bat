@@ -38,7 +38,7 @@ if "%1" == "build-image" (
 @REM Run im2latex-api container
 if "%1" == "run-container" (
     docker rm -f im2latex-api
-    docker run -p 8080:8000 -it --rm --name im2latex-api im2latex/api-server
+    docker run -p 60000:60000 -p 60001:60001 -it --rm --name im2latex-api im2latex/api-server
     goto end
 )
 
