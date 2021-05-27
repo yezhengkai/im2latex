@@ -6,5 +6,6 @@ torchmetrics==0.3.1
 smart_open
 fastapi
 uvicorn
+streamlit
 editdistance
 toml
