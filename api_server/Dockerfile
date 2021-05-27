@@ -12,10 +12,11 @@ RUN pip install -r requirements.txt
 
 # Copy only the relevant directories
 COPY im2latex/ ./im2latex
-COPY api_server/ ./api
+COPY api_server/ ./api_server
 COPY data/processed/im2latex_100k/*.json data/processed/im2latex_100k/
 
-# Run the web server
-EXPOSE 8000
+# Run the web server and streamlit app
+EXPOSE 60000 60001
 ENV PYTHONPATH /repo
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT [ "./api_server/run_app_in_container.sh" ]
+CMD [ "/bin/bash" ]
