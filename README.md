@@ -81,6 +81,9 @@ Under the project root directory, run
 pytest -s api_server/tests/test_app.py
 ```
 
+# Streamlit App
+You can try [Image to LaTeX App](https://share.streamlit.io/yezhengkai/im2latex/api_server/streamlit_app.py) online. But please note that for images other than the training data set, the model performance is still very poor.
+
 # References
 - [luopeixiang/im2latex](https://github.com/luopeixiang/im2latex)
 - [fsdl-text-recognizer-2021-labs](https://github.com/full-stack-deep-learning/fsdl-text-recognizer-2021-labs)
