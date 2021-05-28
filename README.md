@@ -53,8 +53,9 @@ docker rmi -f im2latex/api-server
 ## Run the container
 Under the project root directory, run
 ```bash
-docker run -p 8080:8000 -it --rm --name im2latex-api im2latex/api-server
+docker run -p 60000:60000 -p 60001:60001 -it --rm --name im2latex-api im2latex/api-server
 ```
+Then, we can use the model API through port 60000 and use the Streamlit App through port 60001.
 
 If the container is already running, you can use the following command to remove the existing container.
 ```bash
