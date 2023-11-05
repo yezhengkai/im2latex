@@ -7,8 +7,8 @@ WORKDIR /repo
 
 # Install Python dependencies
 COPY api_server/requirements.txt ./requirements.txt
-RUN pip install --upgrade pip~=21.0.0
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip~=21.0.0 \
+    && pip install --no-cache-dir -r requirements.txt
 
 # Copy only the relevant directories
 COPY im2latex/ ./im2latex
