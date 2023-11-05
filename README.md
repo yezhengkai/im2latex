@@ -82,7 +82,7 @@ pytest -s api_server/tests/test_app.py
 ```
 
 # Streamlit App
-You can try Image to LaTeX App on [Streamlit Community Cloud](https://share.streamlit.io/yezhengkai/im2latex/api_server/streamlit_app.py) or [Hugging Face Space](https://huggingface.co/spaces/yezhengkai/im2latex). But please note that for images other than the training data set, the model performance is still very poor.
+You can try Image to LaTeX App on [Hugging Face Space](https://huggingface.co/spaces/yezhengkai/im2latex). But please note that for images other than the training data set, the model performance is still very poor.
 
 # Ideas
 - Small data can cause exposure bias. We may be able to mitigate exposure bias through scheduled sampling.
